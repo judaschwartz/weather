@@ -84,12 +84,12 @@ body {
   justify-content: flex-end;
 }
 .zip-input {
-  width: 160px;
+  width: 175px;
   padding: 9px 12px;
-  border-radius: 18px;
-  border: 1px solid var(--border);
-  background: rgba(255,255,255,.08);
-  color: var(--text);
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.4);
+  background: rgba(255,255,255,.0);
+  color: #fff;
   outline: none;
   font-size: .8rem;
 }
@@ -183,8 +183,8 @@ th, td { padding: 10px 14px; text-align: center; white-space: nowrap; }
 
 /* ── daily day header ── */
 th.day { vertical-align: top; padding: 14px 14px 10px; }
-.day-name { font-size: .88rem; font-weight: 600; }
-.day-date { font-size: .72rem; color: var(--muted); margin-top: 2px; }
+.day-name { font-size: 1rem; font-weight: 600; }
+.day-date { font-size: .9rem; color: var(--muted); margin-top: 2px; }
 .day-icon { font-size: 1.9rem; margin: 7px 0 4px; display: block; line-height: 1; }
 .day-cond { font-size: .8rem; color: var(--muted); }
 .today { color: var(--accent) !important; }

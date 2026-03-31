@@ -140,7 +140,6 @@ async function init() {
   }
 }
 
-/* ── silent background refresh ── */
 async function refresh() {
   try {
     weatherData = await fetchWeather()
@@ -150,7 +149,6 @@ async function refresh() {
 
 setInterval(refresh, 30 * 60 * 1000)
 
-/* ── geolocation ── */
 function getPosition() {
   return new Promise((res, rej) => {
     if (!navigator.geolocation)
@@ -270,7 +268,7 @@ async function fetchWeather() {
     daily: 'weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,sunset',
     hourly: 'temperature_2m,precipitation,precipitation_probability,weathercode,wind_speed_10m',
     current: 'weathercode,temperature,apparent_temperature',
-    forecast_days: '10',
+    forecast_days: '12',
     forecast_hours: '30',
     timezone: 'auto',
   })
@@ -279,7 +277,14 @@ async function fetchWeather() {
   return r.json()
 }
 
-/* ── main render ── */
+function hebDate(date = new Date()) {
+  const letters = { 1: 'א', 2: 'ב', 3: 'ג', 4: 'ד', 5: 'ה', 6: 'ו', 7: 'ז', 8: 'ח', 9: 'ט', 10: 'י', 11: 'יא', 12: 'יב', 13: 'יג', 14: 'יד', 15: 'טו', 16: 'טז', 17: 'יז', 18: 'יח', 19: 'יט', 20: 'כ', 21: 'כא', 22: 'כב', 23: 'כג', 24: 'כד', 25: 'כה', 26: 'כו', 27: 'כז', 28: 'כח', 29: 'כט', 30: 'ל' }
+  const month = date.toLocaleDateString('he-u-ca-hebrew', { month:'long' })
+  const day = letters[date.toLocaleDateString('he-u-ca-hebrew', { day:'numeric' })]
+  const sunset = date.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }).replace('PM', '')
+  return `${day} ${month} ${sunset}`
+}
+
 function render() {
   const now = new Date()
   const pad = n => String(n).padStart(2, '0')
@@ -313,23 +318,21 @@ function renderDaily() {
   const d = weatherData.daily
 
   for (let i = 0; i < d.time.length; i++) {
-    const dt = new Date(d.time[i] + 'T12:00:00')
-    const name = i === 0 ? 'Today' : dt.toLocaleDateString('en-US', { weekday:'short' })
-    const date = dt.toLocaleDateString('en-US', { month:'short', day:'numeric' })
+    const sunset = new Date(d.sunset[i])
+    const date = sunset.toLocaleDateString('en-US', { month:'short', day:'numeric',  weekday:'short' })
     const [cond, icon] = wmo(d.weathercode[i])
     const hi = d.temperature_2m_max[i]
     const lo = d.temperature_2m_min[i]
     const prob = d.precipitation_probability_max[i] ?? 0
     const amt = d.precipitation_sum[i] ?? 0
     const wind = d.wind_speed_10m_max[i]
-    const sunset = new Date(d.sunset[i])
 
     /* day header cell */
     const th = document.createElement('th')
     th.className = 'day'
     th.innerHTML = `
-      <div class="day-name${i === 0 ? ' today' : ''}">${name}, ${date}</div>
-      <div class="day-date">${sunset.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' })}</div>
+      <div class="day-name${i === 0 ? ' today' : ''}">${date}</div>
+      <div class="day-date">${hebDate(sunset)}</div>
       <span class="day-icon">${icon}</span>
       <div class="day-cond">${cond}</div>`
     document.getElementById('d-hdr').appendChild(th)
