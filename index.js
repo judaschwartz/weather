@@ -1,4 +1,3 @@
-/* ── WMO weather-code map ── */
 const WMO = {
   0:  ['Clear Sky',           '☀️'],
   1:  ['Mainly Clear',        '🌤️'],
@@ -26,88 +25,53 @@ const WMO = {
   99: ['T-storm + Hail',      '⛈️'],
 }
 const wmo = code => WMO[code] || ['Unknown', '🌡️']
+const currentUrl = new URL(window.location.href)
 
-/* ── state ── */
 let weatherData = null, locName = ''
-let isFahrenheit = true
+let isFahrenheit = currentUrl.searchParams.get('cel') !== '1'
 let cachedLat = null, cachedLon = null
 
-/* ── unit helpers ── */
-const c2f = c => (c * 9 / 5) + 32
-const mm2in = mm => mm / 25.4
-const kmh2mph = kmh => kmh * 0.621371
-
-function fTemp(c) {
-  const v = isFahrenheit ? Math.round(c2f(c)) : Math.round(c)
-  return `${v}°${isFahrenheit ? 'F' : 'C'}`
-}
+const fTemp = c => Math.round(isFahrenheit ? (c * 9 / 5) + 32 : c) + '°'
 
 function fPrecip(mm) {
   if (!mm) return '—'
-  return isFahrenheit ? `${mm2in(mm).toFixed(2)}"` : `${mm.toFixed(1)} mm`
+  return isFahrenheit ? `${(mm / 25.4).toFixed(2)}"` : `${mm.toFixed(1)} mm`
 }
 
 function fWind(kmh) {
   if (kmh == null) return '—'
-  const v = isFahrenheit ? Math.round(kmh2mph(kmh)) : Math.round(kmh)
+  const v = isFahrenheit ? Math.round(kmh * 0.621371) : Math.round(kmh)
   return `${v} ${isFahrenheit ? 'mph' : 'km/h'}`
 }
 
 function toggleUnits() {
   isFahrenheit = !isFahrenheit
   if (weatherData) render()
+  currentUrl.searchParams.set('cel', !isFahrenheit ? '1' : '0')
+  window.history.replaceState({}, '', currentUrl)
 }
 
-function setZipMessage(message) {
-  document.getElementById('zip-msg').textContent = message
-}
-
-function setZipLoading(isLoading) {
-  const input = document.getElementById('zip-input')
-  const button = document.getElementById('zip-btn')
-  input.disabled = isLoading
-  button.disabled = isLoading
-  button.textContent = isLoading ? 'Updating...' : 'Change Location'
-}
-
-function getSavedLocationParam() {
-  const params = new URLSearchParams(window.location.search)
-  return params.get('location')?.trim() || ''
-}
-
-function setSavedLocationParam(postalCode) {
-  const url = new URL(window.location.href)
-  if (postalCode) {
-    url.searchParams.set('location', postalCode)
+async function loadLocation() {
+  const locInput = currentUrl.searchParams.get('location')?.trim() || ''
+  if (!locInput) {
+    await setCurrentLocation()
   } else {
-    url.searchParams.delete('location')
+    const { lat, lon, name } = await lookupPostalCode(locInput)
+    cachedLat = lat
+    cachedLon = lon
+    locName = name
   }
-  window.history.replaceState({}, '', url)
 }
 
-async function loadPostalLocation(postalCode) {
-  const { lat, lon, name } = await lookupPostalCode(postalCode)
-  cachedLat = lat
-  cachedLon = lon
-  const nextWeather = await fetchWeather()
-  locName = name
-  weatherData = nextWeather
-  document.getElementById('zip-input').value = postalCode
-  setSavedLocationParam(postalCode)
-  return name
-}
-
-async function loadCurrentLocation(keepInput = true) {
+async function setCurrentLocation() {
   const pos = await getPosition()
   const { latitude, longitude } = pos.coords
-  cachedLat = latitude
-  cachedLon = longitude
-  weatherData = await fetchWeather()
   locName = await revGeocode(latitude, longitude)
-  if (!keepInput) document.getElementById('zip-input').value = ''
+  currentUrl.searchParams.set('location', locName)
+  window.history.replaceState({}, '', currentUrl)
+  location.reload()
 }
 
-/* ── screen helper ── */
 function show(id) {
   document.getElementById('loading').style.display = id === 'loading' ? 'flex' : 'none'
   document.getElementById('error').style.display = id === 'error' ? 'flex' : 'none'
@@ -117,20 +81,8 @@ function show(id) {
 async function init() {
   show('loading')
   try {
-    const savedPostalCode = getSavedLocationParam()
-    if (savedPostalCode) {
-      try {
-        await loadPostalLocation(savedPostalCode)
-        setZipMessage(`Showing forecast for ${locName}.`)
-      } catch {
-        setSavedLocationParam('')
-        await loadCurrentLocation()
-        setZipMessage('Saved location was invalid, using current location.')
-      }
-    } else {
-      await loadCurrentLocation()
-      setZipMessage('')
-    }
+    await loadLocation()
+    weatherData = await fetchWeather()
     render()
     show('main')
   } catch (e) {
@@ -146,8 +98,6 @@ async function refresh() {
     render()
   } catch { console.log('Failed to refresh weather data, data stayed as-is') }
 }
-
-setInterval(refresh, 30 * 60 * 1000)
 
 function getPosition() {
   return new Promise((res, rej) => {
@@ -183,7 +133,6 @@ async function lookupPostalCode(postalCode) {
   if (/^\d{5}(?:-\d{4})?$/.test(query)) { // is usa zip
     const usZipResult = await lookupUsZipCode(query)
     if (usZipResult) return usZipResult
-
     const usUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&countrycodes=us&postalcode=${encodeURIComponent(query)}`
     const usResponse = await fetch(usUrl, { headers: { 'Accept-Language': 'en-US,en' } })
     if (usResponse.ok) {
@@ -199,14 +148,11 @@ async function lookupPostalCode(postalCode) {
       }
     }
   }
-
   const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&q=${encodeURIComponent(query)}`
   const response = await fetch(url, { headers: { 'Accept-Language': 'en-US,en' } })
   if (!response.ok) throw new Error('Could not look up that ZIP code.')
-
   const results = await response.json()
   if (!results.length) throw new Error('No location found for that ZIP code.')
-
   const result = results[0]
   const name = result.address?.city || result.address?.town || result.address?.village || result.address?.county || result.display_name.split(',')[0] || query
   return {
@@ -216,40 +162,14 @@ async function lookupPostalCode(postalCode) {
   }
 }
 
-async function changeLocation(event) {
-  event.preventDefault()
-  const input = document.getElementById('zip-input')
-  const postalCode = input.value.trim()
-  if (!postalCode) {
-    setZipMessage('Trying to use current location.')
-    try {
-      await loadCurrentLocation()
-      setSavedLocationParam('')
-      render()
-      show('main')
-      setZipMessage('Showing forecast for current location.')
-    } catch (error) {
-      setZipMessage('Unable to use current location. Please enter a ZIP code.')
-    }
-    return
-  }
-
-  setZipLoading(true)
-  setZipMessage('')
-
-  try {
-    const name = await loadPostalLocation(postalCode)
-    render()
-    show('main')
-    setZipMessage(`Showing forecast for ${name}.`)
-  } catch (error) {
-    setZipMessage(error.message || 'Unable to change location.')
-  } finally {
-    setZipLoading(false)
-  }
+function changeLocation(e) {
+  e?.preventDefault()
+  const postalCode = document.getElementById('zip-input').value
+  currentUrl.searchParams.set('location', postalCode.trim())
+  window.history.replaceState({}, '', currentUrl)
+  location.reload()
 }
 
-/* ── reverse geocode via Nominatim ── */
 async function revGeocode(lat, lon) {
   try {
     const r = await fetch(
@@ -261,7 +181,6 @@ async function revGeocode(lat, lon) {
   } catch { return 'My Location' }
 }
 
-/* ── Open-Meteo forecast ── */
 async function fetchWeather() {
   const params = new URLSearchParams({
     latitude: cachedLat, longitude: cachedLon,
@@ -295,6 +214,7 @@ function render() {
   document.getElementById('loc').textContent = locName
   document.getElementById('hdr-date').textContent = now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' })
   document.getElementById('hdr-time').textContent = now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' })
+  document.getElementById('zip-input').value = currentUrl.searchParams.get('location')?.trim() || ''
 
   const [cwDesc, cwIcon] = wmo(weatherData.current.weathercode)
   document.getElementById('cur-temp').textContent = fTemp(weatherData.current.temperature)
@@ -306,13 +226,11 @@ function render() {
   renderHourly(now, curHourStr)
 }
 
-/* ── clear row columns (keep label cell) ── */
 function clearRow(id) {
   const row = document.getElementById(id)
   while (row.children.length > 0) row.removeChild(row.lastChild)
 }
 
-/* ── 10-day table ── */
 function renderDaily() {
   ['d-hdr','d-temp','d-precip','d-wind'].forEach(clearRow)
   const d = weatherData.daily
@@ -357,7 +275,6 @@ function renderDaily() {
   }
 }
 
-/* ── hourly table (24 h from current hour) ── */
 function renderHourly(now, curHourStr) {
   ['h-hdr','h-temp','h-precip','h-wind'].forEach(clearRow)
 
@@ -405,4 +322,6 @@ function renderHourly(now, curHourStr) {
     document.getElementById('h-wind').appendChild(wtd)
   }
 }
+
 init()
+setInterval(refresh, 30 * 60 * 1000)
