@@ -40,8 +40,13 @@ function fPrecip(mm) {
 
 function fWind(kmh) {
   if (kmh == null) return '—'
-  const v = isFahrenheit ? Math.round(kmh * 0.621371) : Math.round(kmh)
-  return `${v} ${isFahrenheit ? 'mph' : 'km/h'}`
+  if (typeof kmh === 'string') {
+    const [max, min] = kmh.split('/').map(Number)
+    const vMax = Math.round(isFahrenheit ? max * 0.621371 : max)
+    const vMin = Math.round(isFahrenheit ? min * 0.621371 : min)
+    return `${vMin}-${vMax} ${isFahrenheit ? 'mph' : 'km/h'}`
+  }
+  return `${Math.round(isFahrenheit ? kmh * 0.621371 : kmh)} ${isFahrenheit ? 'mph' : 'km/h'}`
 }
 
 function toggleUnits() {
@@ -184,7 +189,7 @@ async function revGeocode(lat, lon) {
 async function fetchWeather() {
   const params = new URLSearchParams({
     latitude: cachedLat, longitude: cachedLon,
-    daily: 'weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,sunset',
+    daily: 'weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_speed_10m_min,sunset',
     hourly: 'temperature_2m,precipitation,precipitation_probability,weathercode,wind_speed_10m',
     current: 'weathercode,temperature,apparent_temperature',
     forecast_days: '12',
@@ -208,12 +213,9 @@ function render() {
   const now = new Date()
   const pad = n => String(n).padStart(2, '0')
   const todayStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`
-  const curHourStr = `${todayStr}T${pad(now.getHours())}:00`
 
   /* header */
   document.getElementById('loc').textContent = locName
-  document.getElementById('hdr-date').textContent = now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' })
-  document.getElementById('hdr-time').textContent = now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' })
   document.getElementById('zip-input').value = currentUrl.searchParams.get('location')?.trim() || ''
 
   const [cwDesc, cwIcon] = wmo(weatherData.current.weathercode)
@@ -223,7 +225,7 @@ function render() {
   document.getElementById('cur-feels').textContent =
       `Feels like ${fTemp(weatherData.current.apparent_temperature)}`
   renderDaily()
-  renderHourly(now, curHourStr)
+  renderHourly()
 }
 
 function clearRow(id) {
@@ -243,7 +245,7 @@ function renderDaily() {
     const lo = d.temperature_2m_min[i]
     const prob = d.precipitation_probability_max[i] ?? 0
     const amt = d.precipitation_sum[i] ?? 0
-    const wind = d.wind_speed_10m_max[i]
+    const wind = d.wind_speed_10m_max[i] + '/' + d.wind_speed_10m_min[i]
 
     /* day header cell */
     const th = document.createElement('th')
@@ -275,13 +277,10 @@ function renderDaily() {
   }
 }
 
-function renderHourly(now, curHourStr) {
+function renderHourly(offset = 0) {
   ['h-hdr','h-temp','h-precip','h-wind'].forEach(clearRow)
-
   const h = weatherData.hourly
-  let start = h.time.indexOf(curHourStr)
-  if (start < 0) start = h.time.findIndex(t => new Date(t) > now)
-  if (start < 0) start = 0
+  const start = offset
   const end = Math.min(start + 25, h.time.length)
 
   for (let i = start; i < end; i++) {
@@ -316,12 +315,20 @@ function renderHourly(now, curHourStr) {
     document.getElementById('h-precip').appendChild(ptd)
 
     /* wind */
-    const wtd = document.createElement('td')
-    if (isCur) wtd.className = 'cur-col'
-    wtd.innerHTML = `<div class="wspd">${fWind(wind)}</div>`
-    document.getElementById('h-wind').appendChild(wtd)
+    if (!offset) {
+      const wtd = document.createElement('td')
+      if (isCur) wtd.className = 'cur-col'
+      wtd.innerHTML = `<div class="wspd">${fWind(wind)}</div>`
+      document.getElementById('h-wind').appendChild(wtd)
+    }
   }
 }
 
 init()
-setInterval(refresh, 30 * 60 * 1000)
+setInterval(refresh, 10 * 60 * 1000)
+setInterval(() => {
+  const now = new Date()
+  document.getElementById('hdr-time').textContent = now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }).replace('PM', '') .replace('AM', '')
+  document.getElementById('hdr-seconds').textContent = now.toLocaleTimeString('en-US', { second:'2-digit' }).padStart(2, '0')
+  document.getElementById('hdr-date').textContent = now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' })
+}, 1 * 240)

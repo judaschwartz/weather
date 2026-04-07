@@ -30,7 +30,7 @@
             <div class="cur-desc" id="cur-desc">—</div>
           </div>
           <div class="datetime-block">
-            <div class="dt-time" id="hdr-time">—</div>
+            <div class="dt-time"><span id="hdr-time">—</span><span id="hdr-seconds">—</span></div>
             <div class="dt-date" id="hdr-date">—</div>
           </div>
         </div>
@@ -40,7 +40,6 @@
           <button class="rfr-btn" type="button" onclick="refresh()">⟳</button>
           <button class="unit-btn" onclick="toggleUnits()">°F / °C</button>
           <form class="loc-form" onsubmit="changeLocation(event)">
-            <label class="sr-only" for="zip-input">ZIP or postal code</label>
             <input id="zip-input" class="zip-input" type="text" inputmode="text" autocomplete="postal-code" placeholder="ZIP code">
             <button id="zip-btn" class="zip-btn" type="submit">Change Location</button>
           </form>
@@ -56,8 +55,7 @@
     <div class="card">
       <div class="scroll">
         <table>
-          <caption class="sr-only">10-day weather forecast</caption>
-          <thead><tr id="d-hdr"><th class="sr-only" scope="col">Day forecast</th></tr></thead>
+          <thead><tr id="d-hdr"><th scope="col">Day forecast</th></tr></thead>
           <tbody>
             <tr id="d-temp"></tr>
             <tr id="d-precip"></tr>
@@ -69,8 +67,7 @@
     <div class="card">
       <div class="scroll hourly-wrap">
         <table>
-          <caption class="sr-only">Hourly weather forecast</caption>
-          <thead><tr id="h-hdr"><th class="sr-only" scope="col">Hourly forecast</th></tr></thead>
+          <thead><tr id="h-hdr"><th scope="col">Hourly forecast</th></tr></thead>
           <tbody>
             <tr id="h-temp"></tr>
             <tr id="h-precip"></tr>
