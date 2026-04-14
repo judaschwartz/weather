@@ -106,7 +106,9 @@ async function init() {
 async function refresh() {
   try {
     weatherData = await fetchWeather()
-    if (selectedDayIndex === 0) selectedHourlyData = null
+    selectedDayIndex = 0
+    selectedHourlyData = null
+    hourlyByDayCache.clear()
     render()
   } catch { console.log('Failed to refresh weather data, data stayed as-is') }
 }
@@ -223,38 +225,30 @@ async function fetchHourlyForDay(dayIso) {
   return data.hourly
 }
 
-function scheduleResetToCurrentTimer() {
-  clearTimeout(resetToCurrentDayTimer)
-  resetToCurrentDayTimer = setTimeout(() => {
-    selectedDayIndex = 0
-    selectedHourlyData = null
-    render()
-  }, 2 * 60 * 1000)
-}
-
 async function onDayClick(index) {
-  if (!weatherData?.daily?.time?.[index]) return
-
-  if (index === 0) {
-    clearTimeout(resetToCurrentDayTimer)
+  const dayIso = weatherData?.daily?.time?.[index]
+  if (index === 0 || !dayIso) {
     selectedDayIndex = 0
     selectedHourlyData = null
     render()
-    return
-  }
-
-  const dayIso = weatherData.daily.time[index]
-  try {
-    if (!hourlyByDayCache.has(dayIso)) {
-      const hourly = await fetchHourlyForDay(dayIso)
-      hourlyByDayCache.set(dayIso, hourly)
+  } else {
+    try {
+      if (!hourlyByDayCache.has(dayIso)) {
+        const hourly = await fetchHourlyForDay(dayIso)
+        hourlyByDayCache.set(dayIso, hourly)
+      }
+      selectedDayIndex = index
+      selectedHourlyData = hourlyByDayCache.get(dayIso)
+      render()
+      clearTimeout(resetToCurrentDayTimer)
+      resetToCurrentDayTimer = setTimeout(() => {
+        selectedDayIndex = 0
+        selectedHourlyData = null
+        render()
+      }, 2 * 60 * 1000)
+    } catch (e) {
+      console.error(e)
     }
-    selectedDayIndex = index
-    selectedHourlyData = hourlyByDayCache.get(dayIso)
-    render()
-    scheduleResetToCurrentTimer()
-  } catch (e) {
-    console.error(e)
   }
 }
 
@@ -263,14 +257,12 @@ function hebDate(date = new Date()) {
   const month = date.toLocaleDateString('he-u-ca-hebrew', { month:'long' })
   const day = letters[date.toLocaleDateString('he-u-ca-hebrew', { day:'numeric' })]
   const sunset = date.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }).replace('PM', '')
-  return `${day} ${month} ${sunset}`
+  return `${day} ${month} <span>${sunset}</span>`
 }
 
 function render() {
-  /* header */
   document.getElementById('loc').textContent = locName
   document.getElementById('zip-input').value = currentUrl.searchParams.get('location')?.trim() || ''
-
   const [cwDesc, cwIcon] = wmo(weatherData.current.weathercode)
   document.getElementById('cur-temp').textContent = fTemp(weatherData.current.temperature)
   document.getElementById('cur-icon').textContent = cwIcon
@@ -292,7 +284,8 @@ function renderDaily() {
 
   for (let i = 0; i < d.time.length; i++) {
     const sunset = new Date(d.sunset[i])
-    const date = sunset.toLocaleDateString('en-US', { month:'short', day:'numeric',  weekday:'short' })
+    let date = sunset.toLocaleDateString('en-US', { weekday:'short' })
+    date += `, <span>${sunset.toLocaleDateString('en-US', { month:'short', day:'numeric' })}</span>`
     const [cond, icon] = wmo(d.weathercode[i])
     const hi = d.temperature_2m_max[i]
     const lo = d.temperature_2m_min[i]
@@ -381,10 +374,10 @@ function renderHourly() {
 }
 
 init()
-setInterval(refresh, 10 * 60 * 1000)
+setInterval(refresh, 14 * 60 * 1000)
 setInterval(() => {
   const now = new Date()
   document.getElementById('hdr-time').textContent = now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }).replace('PM', '') .replace('AM', '')
   document.getElementById('hdr-seconds').textContent = now.toLocaleTimeString('en-US', { second:'2-digit' }).padStart(2, '0')
   document.getElementById('hdr-date').textContent = now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' })
-}, 1 * 240)
+}, 1 * 333)
