@@ -30,6 +30,12 @@ const currentUrl = new URL(window.location.href)
 let weatherData = null, locName = ''
 let isFahrenheit = currentUrl.searchParams.get('cel') !== '1'
 let cachedLat = null, cachedLon = null
+let selectedDayIndex = 0
+let selectedHourlyData = null
+let resetToCurrentDayTimer = -1
+
+const HOURLY_FIELDS = 'temperature_2m,precipitation,precipitation_probability,weathercode,wind_speed_10m'
+const hourlyByDayCache = new Map()
 
 const fTemp = c => Math.round(isFahrenheit ? (c * 9 / 5) + 32 : c) + '°'
 
@@ -100,6 +106,7 @@ async function init() {
 async function refresh() {
   try {
     weatherData = await fetchWeather()
+    if (selectedDayIndex === 0) selectedHourlyData = null
     render()
   } catch { console.log('Failed to refresh weather data, data stayed as-is') }
 }
@@ -190,15 +197,65 @@ async function fetchWeather() {
   const params = new URLSearchParams({
     latitude: cachedLat, longitude: cachedLon,
     daily: 'weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_speed_10m_min,sunset',
-    hourly: 'temperature_2m,precipitation,precipitation_probability,weathercode,wind_speed_10m',
+    hourly: HOURLY_FIELDS,
     current: 'weathercode,temperature,apparent_temperature',
     forecast_days: '12',
-    forecast_hours: '30',
+    forecast_hours: '24',
     timezone: 'auto',
   })
   const r = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
   if (!r.ok) throw new Error('Weather service unavailable. Please try again.')
   return r.json()
+}
+
+async function fetchHourlyForDay(dayIso) {
+  const params = new URLSearchParams({
+    latitude: cachedLat,
+    longitude: cachedLon,
+    hourly: HOURLY_FIELDS,
+    start_date: dayIso,
+    end_date: dayIso,
+    timezone: 'auto',
+  })
+  const r = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
+  if (!r.ok) throw new Error('Could not load hourly forecast for selected day.')
+  const data = await r.json()
+  return data.hourly
+}
+
+function scheduleResetToCurrentTimer() {
+  clearTimeout(resetToCurrentDayTimer)
+  resetToCurrentDayTimer = setTimeout(() => {
+    selectedDayIndex = 0
+    selectedHourlyData = null
+    render()
+  }, 2 * 60 * 1000)
+}
+
+async function onDayClick(index) {
+  if (!weatherData?.daily?.time?.[index]) return
+
+  if (index === 0) {
+    clearTimeout(resetToCurrentDayTimer)
+    selectedDayIndex = 0
+    selectedHourlyData = null
+    render()
+    return
+  }
+
+  const dayIso = weatherData.daily.time[index]
+  try {
+    if (!hourlyByDayCache.has(dayIso)) {
+      const hourly = await fetchHourlyForDay(dayIso)
+      hourlyByDayCache.set(dayIso, hourly)
+    }
+    selectedDayIndex = index
+    selectedHourlyData = hourlyByDayCache.get(dayIso)
+    render()
+    scheduleResetToCurrentTimer()
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 function hebDate(date = new Date()) {
@@ -210,10 +267,6 @@ function hebDate(date = new Date()) {
 }
 
 function render() {
-  const now = new Date()
-  const pad = n => String(n).padStart(2, '0')
-  const todayStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`
-
   /* header */
   document.getElementById('loc').textContent = locName
   document.getElementById('zip-input').value = currentUrl.searchParams.get('location')?.trim() || ''
@@ -249,12 +302,14 @@ function renderDaily() {
 
     /* day header cell */
     const th = document.createElement('th')
-    th.className = 'day'
+    th.className = i === selectedDayIndex ? 'day active' : 'day'
+    th.style.cursor = 'pointer'
     th.innerHTML = `
-      <div class="day-name${i === 0 ? ' today' : ''}">${date}</div>
+      <div class="day-name">${!i ? 'Today' : date}</div>
       <div class="day-date">${hebDate(sunset)}</div>
       <span class="day-icon">${icon}</span>
       <div class="day-cond">${cond}</div>`
+    th.addEventListener('click', () => { onDayClick(i) })
     document.getElementById('d-hdr').appendChild(th)
 
     /* temperature cell */
@@ -267,7 +322,7 @@ function renderDaily() {
     /* precipitation cell */
     const ptd = document.createElement('td')
     const hasP = prob > 0
-    ptd.innerHTML = `<div class="p-prob${hasP ? '' : ' dim'}">${prob}%</div><div class="p-amt">${fPrecip(amt)}</div>`
+    ptd.innerHTML = `<div class="p-prob${hasP ? '' : ' dim'}">${Math.round(prob / 10) * 10}%</div><div class="p-amt">${fPrecip(amt)}</div>`
     document.getElementById('d-precip').appendChild(ptd)
 
     /* wind cell */
@@ -277,14 +332,20 @@ function renderDaily() {
   }
 }
 
-function renderHourly(offset = 0) {
+function renderHourly() {
   ['h-hdr','h-temp','h-precip','h-wind'].forEach(clearRow)
-  const h = weatherData.hourly
-  const start = offset
-  const end = Math.min(start + 25, h.time.length)
+  const isCurrentDayView = selectedDayIndex === 0 || !selectedHourlyData
+  const h = isCurrentDayView ? weatherData.hourly : selectedHourlyData
 
-  for (let i = start; i < end; i++) {
-    const isCur = i === start
+  const dayLabel = (() => {
+    if (isCurrentDayView) return 'Today'
+    const iso = weatherData.daily.time[selectedDayIndex]
+    const [y, m, d] = iso.split('-').map(Number)
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+  })()
+  document.getElementById('hourly-day-label').textContent = dayLabel
+
+  for (let i = 0; i < Math.min(24, h.time.length); i++) {
     const t = new Date(h.time[i])
     const label = t.toLocaleTimeString('en-US', { hour:'numeric', hour12:true })
     const [, icon] = wmo(h.weathercode[i])
@@ -295,32 +356,27 @@ function renderHourly(offset = 0) {
 
     /* header */
     const th = document.createElement('th')
-    th.className = `hr${isCur ? ' cur-col' : ''}`
+    th.className = 'hr'
     th.innerHTML = `<div class="hr-time">${label}</div><span class="hr-icon">${icon}</span>`
     document.getElementById('h-hdr').appendChild(th)
 
     /* temp */
     const ttd = document.createElement('td')
-    if (isCur) ttd.className = 'cur-col'
     ttd.innerHTML = `<div class="hr-temp">${fTemp(temp)}</div>`
     document.getElementById('h-temp').appendChild(ttd)
 
     /* precip */
     const ptd = document.createElement('td')
-    if (isCur) ptd.className = 'cur-col'
     const hasP = prob > 0
     ptd.innerHTML = `
-      <div class="hr-prob${hasP ? '' : ' dim'}">${prob}%</div>
+      <div class="hr-prob${hasP ? '' : ' dim'}">${Math.round(prob / 10) * 10}%</div>
       <div class="hr-amt">${fPrecip(amt)}</div>`
     document.getElementById('h-precip').appendChild(ptd)
 
     /* wind */
-    if (!offset) {
-      const wtd = document.createElement('td')
-      if (isCur) wtd.className = 'cur-col'
-      wtd.innerHTML = `<div class="wspd">${fWind(wind)}</div>`
-      document.getElementById('h-wind').appendChild(wtd)
-    }
+    const wtd = document.createElement('td')
+    wtd.innerHTML = `<div class="wspd">${fWind(wind)}</div>`
+    document.getElementById('h-wind').appendChild(wtd)
   }
 }
 
