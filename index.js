@@ -1,30 +1,30 @@
 const WMO = {
-  0:  ['Clear Sky',           '☀️'],
-  1:  ['Mainly Clear',        '🌤️'],
-  2:  ['Partly Cloudy',       '⛅'],
-  3:  ['Overcast',            '☁️'],
-  45: ['Fog',                 '🌫️'],
-  48: ['Icy Fog',             '🌫️'],
-  51: ['Light Drizzle',       '🌦️'],
-  53: ['Drizzle',             '🌦️'],
-  55: ['Heavy Drizzle',       '🌧️'],
-  61: ['Light Rain',          '🌧️'],
-  63: ['Rain',                '🌧️'],
-  65: ['Heavy Rain',          '🌧️'],
-  71: ['Light Snow',          '🌨️'],
-  73: ['Snow',                '❄️'],
-  75: ['Heavy Snow',          '❄️'],
-  77: ['Snow Grains',         '🌨️'],
-  80: ['Showers',             '🌦️'],
-  81: ['Showers',             '🌦️'],
-  82: ['Heavy Showers',       '⛈️'],
-  85: ['Snow Showers',        '🌨️'],
-  86: ['Heavy Snow Showers',  '❄️'],
-  95: ['Thunderstorm',        '⛈️'],
-  96: ['T-storm + Hail',      '⛈️'],
-  99: ['T-storm + Hail',      '⛈️'],
+  0:  ['Clear Sky',      '☀️'],
+  1:  ['Mainly Clear',   '🌤️'],
+  2:  ['Partly Cloudy',  '⛅'],
+  3:  ['Overcast',       '☁️'],
+  45: ['Fog',            '🌫️'],
+  48: ['Icy Fog',        '🌫️'],
+  51: ['Light Drizzle',  '🌦️'],
+  53: ['Drizzle',        '🌦️'],
+  55: ['Heavy Drizzle',  '🌧️'],
+  61: ['Light Rain',     '🌧️'],
+  63: ['Rain',           '🌧️'],
+  65: ['Heavy Rain',     '🌧️'],
+  71: ['Light Snow',     '🌨️'],
+  73: ['Snow',           '❄️'],
+  75: ['Heavy Snow',     '❄️'],
+  77: ['Snow Grains',    '🌨️'],
+  80: ['Showers',        '🌦️'],
+  81: ['Showers',        '🌦️'],
+  82: ['Heavy Showers',  '⛈️'],
+  85: ['Snow Showers',   '🌨️'],
+  86: ['Snow Showers',   '❄️'],
+  95: ['Thunderstorm',   '⛈️'],
+  96: ['T-storm + Hail', '⛈️'],
+  99: ['T-storm + Hail', '⛈️'],
 }
-const wmo = code => WMO[code] || ['Unknown', '🌡️']
+const wmo = code => WMO[code] || [`Unknown: ${code}`, '🌡️']
 const currentUrl = new URL(window.location.href)
 
 let weatherData = null, locName = ''
@@ -178,7 +178,7 @@ async function lookupPostalCode(postalCode) {
 
 function changeLocation(e) {
   e?.preventDefault()
-  const postalCode = document.getElementById('zip-input').value
+  const postalCode = e.target.querySelector('input').value
   currentUrl.searchParams.set('location', postalCode.trim())
   window.history.replaceState({}, '', currentUrl)
   location.reload()
@@ -254,8 +254,8 @@ async function onDayClick(index) {
 
 function hebDate(date = new Date()) {
   const letters = { 1: 'א', 2: 'ב', 3: 'ג', 4: 'ד', 5: 'ה', 6: 'ו', 7: 'ז', 8: 'ח', 9: 'ט', 10: 'י', 11: 'יא', 12: 'יב', 13: 'יג', 14: 'יד', 15: 'טו', 16: 'טז', 17: 'יז', 18: 'יח', 19: 'יט', 20: 'כ', 21: 'כא', 22: 'כב', 23: 'כג', 24: 'כד', 25: 'כה', 26: 'כו', 27: 'כז', 28: 'כח', 29: 'כט', 30: 'ל' }
-  const month = date.toLocaleDateString('he-u-ca-hebrew', { month:'long' })
-  const day = letters[date.toLocaleDateString('he-u-ca-hebrew', { day:'numeric' })]
+  const month = date.toLocaleDateString('he-u-ca-hebrew', { month: 'long' })
+  const day = letters[date.toLocaleDateString('he-u-ca-hebrew', { day: 'numeric' })]
   const sunset = date.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }).replace('PM', '')
   return `${day} ${month} <span>${sunset}</span>`
 }

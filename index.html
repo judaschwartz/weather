@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=portrait">
   <title>Weather Forecast</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'><text y='32' font-size='32'>🌦️</text></svg>">
@@ -17,6 +17,10 @@
     <p style="font-size:1.6rem">⚠️</p>
     <p id="err-msg" style="color:var(--muted);max-width:280px;line-height:1.5">Could not load weather data.</p>
     <button class="retry-btn" onclick="init()">Try Again</button>
+    <form class="loc-form" style="justify-content: center;" onsubmit="changeLocation(event)" style="margin-top: 16px;">
+      <input id="zip-input-error" class="zip-input" type="text" inputmode="text" autocomplete="postal-code" placeholder="ZIP code">
+      <button id="zip-btn-error" class="zip-btn" type="submit">Change Location</button>
+    </form>
   </div>
   <div id="main">
     <div class="hdr">
