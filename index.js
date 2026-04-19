@@ -198,7 +198,7 @@ async function revGeocode(lat, lon) {
 async function fetchWeather() {
   const params = new URLSearchParams({
     latitude: cachedLat, longitude: cachedLon,
-    daily: 'weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_speed_10m_min,sunset',
+    daily: 'weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_speed_10m_min,sunrise,sunset',
     hourly: HOURLY_FIELDS,
     current: 'weathercode,temperature,apparent_temperature',
     forecast_days: '12',
@@ -271,11 +271,129 @@ function render() {
       `Feels like ${fTemp(weatherData.current.apparent_temperature)}`
   renderDaily()
   renderHourly()
+  renderZmanim()
 }
 
 function clearRow(id) {
   const row = document.getElementById(id)
   while (row.children.length > 0) row.removeChild(row.lastChild)
+}
+
+function buildSmoothPath(points) {
+  if (!points.length) return ''
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`
+
+  let path = `M ${points[0].x} ${points[0].y}`
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const prev = points[i - 1] || points[i]
+    const curr = points[i]
+    const next = points[i + 1]
+    const after = points[i + 2] || next
+    const tension = 0.18
+    const control1X = curr.x + (next.x - prev.x) * tension
+    const control1Y = curr.y + (next.y - prev.y) * tension
+    const control2X = next.x - (after.x - curr.x) * tension
+    const control2Y = next.y - (after.y - curr.y) * tension
+
+    path += ` C ${control1X} ${control1Y}, ${control2X} ${control2Y}, ${next.x} ${next.y}`
+  }
+
+  return path
+}
+
+function buildHourlyGraph(temps) {
+  const graph = document.createElement('div')
+  graph.className = 'hourly-graph'
+
+  const count = temps.length
+  const minTemp = Math.min(...temps)
+  const maxTemp = Math.max(...temps)
+  const actualRange = maxTemp - minTemp
+  const minVisualRange = isFahrenheit ? (15 * 5 / 9) : 15
+  const spread = Math.max(actualRange, minVisualRange)
+  const midTemp = (minTemp + maxTemp) / 2
+  const visualMinTemp = midTemp - (spread / 2)
+  const pad = 14
+
+  const points = temps.map((temp, index) => {
+    const x = count === 1 ? 50 : (index / (count - 1)) * 100
+    const y = 100 - (((temp - visualMinTemp) / spread) * (100 - (pad * 2)) + pad)
+    return { x, y, temp }
+  })
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  svg.setAttribute('class', 'hourly-graph-svg')
+  svg.setAttribute('viewBox', '0 0 100 100')
+  svg.setAttribute('preserveAspectRatio', 'none')
+
+  const smoothPath = buildSmoothPath(points)
+
+  const area = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  area.setAttribute('class', 'hourly-graph-area')
+  area.setAttribute('d', [
+    `M ${points[0].x} 100`,
+    smoothPath.replace(/^M [^ ]+ [^ ]+/, `L ${points[0].x} ${points[0].y}`),
+    `L ${points[points.length - 1].x} 100`,
+    'Z',
+  ].join(' '))
+
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  line.setAttribute('class', 'hourly-graph-line')
+  line.setAttribute('d', smoothPath)
+
+  svg.append(area, line)
+  graph.appendChild(svg)
+
+  const pointsLayer = document.createElement('div')
+  pointsLayer.className = 'hourly-graph-points'
+  pointsLayer.style.gridTemplateColumns = `repeat(${count}, minmax(0, 1fr))`
+
+  points.forEach(point => {
+    const item = document.createElement('div')
+    item.className = 'hourly-point'
+    item.style.setProperty('--point-y', `${point.y}%`)
+    item.innerHTML = `
+      <div class="hourly-point-temp">${fTemp(point.temp)}</div>
+      <div class="hourly-point-dot"></div>`
+    pointsLayer.appendChild(item)
+  })
+
+  graph.appendChild(pointsLayer)
+  return graph
+}
+
+const addMinutes = (date, minutes) => new Date(date.getTime() + (minutes * 60 * 1000))
+
+function formatClock(date) {
+  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+
+function renderZmanim() {
+  const d = weatherData?.daily
+  const grid = document.getElementById('zmanim-grid')
+  grid.innerHTML = ''
+
+  const sunrise = new Date(d.sunrise?.[selectedDayIndex])
+  const sunset = new Date(d.sunset?.[selectedDayIndex])
+  const daylightMs = sunset.getTime() - sunrise.getTime()
+  const zmanim = [
+    ['Alos', addMinutes(sunrise, -72)],
+    ['Netz', sunrise],
+    ['Zman Krias Shema', new Date(sunrise.getTime() + (daylightMs / 4))],
+    ['Chatzos', new Date(sunrise.getTime() + (daylightMs / 2))],
+  ]
+  if (sunrise.getDay() === 5) {
+    zmanim.push(['Candle Lighting', addMinutes(sunset, -18)])
+  }
+  zmanim.push(['Shkia', sunset], ['Tzteis', addMinutes(sunset, 60)])
+
+  for (const [name, time] of zmanim) {
+    const item = document.createElement('div')
+    item.className = 'zman-item'
+    item.innerHTML = `<div class="zman-name">${name}</div><div class="zman-time">${formatClock(time)}</div>`
+    grid.appendChild(item)
+  }
 }
 
 function renderDaily() {
@@ -329,6 +447,7 @@ function renderHourly() {
   ['h-hdr','h-temp','h-precip','h-wind'].forEach(clearRow)
   const isCurrentDayView = selectedDayIndex === 0 || !selectedHourlyData
   const h = isCurrentDayView ? weatherData.hourly : selectedHourlyData
+  const hourCount = Math.min(24, h.time.length)
 
   const dayLabel = (() => {
     if (isCurrentDayView) return 'Today'
@@ -338,7 +457,16 @@ function renderHourly() {
   })()
   document.getElementById('hourly-day-label').textContent = dayLabel
 
-  for (let i = 0; i < Math.min(24, h.time.length); i++) {
+  const temps = h.temperature_2m.slice(0, hourCount)
+  const tempCell = document.createElement('td')
+  tempCell.colSpan = hourCount || 1
+  tempCell.className = 'h-temp-graph-cell'
+  if (temps.length) {
+    tempCell.appendChild(buildHourlyGraph(temps))
+  }
+  document.getElementById('h-temp').appendChild(tempCell)
+
+  for (let i = 0; i < hourCount; i++) {
     const t = new Date(h.time[i])
     const label = t.toLocaleTimeString('en-US', { hour:'numeric', hour12:true })
     const [, icon] = wmo(h.weathercode[i])
@@ -352,11 +480,6 @@ function renderHourly() {
     th.className = 'hr'
     th.innerHTML = `<div class="hr-time">${label}</div><span class="hr-icon">${icon}</span>`
     document.getElementById('h-hdr').appendChild(th)
-
-    /* temp */
-    const ttd = document.createElement('td')
-    ttd.innerHTML = `<div class="hr-temp">${fTemp(temp)}</div>`
-    document.getElementById('h-temp').appendChild(ttd)
 
     /* precip */
     const ptd = document.createElement('td')

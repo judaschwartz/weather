@@ -148,15 +148,13 @@ th, td { padding: 10px; text-align: center; white-space: nowrap; }
 
 /* ── hourly: all 24 columns fill the card on wide screens ── */
 @media (min-width: 1180px) {
-  #h-hdr th, #h-temp td, #h-precip td, #h-wind td { min-width: 0; width: calc(100% / 24); }
-  #h-hdr, #h-temp, #h-precip, #h-wind { min-width: 0; }
+  #h-hdr th, #h-precip td, #h-wind td { min-width: 0; width: calc(100% / 24); }
+  #h-hdr, #h-precip, #h-wind { min-width: 0; }
   .hourly-wrap table { min-width: 0; width: 100%; }
   .hourly-wrap { overflow-x: visible; }
   th.hr { padding: 10px 4px 7px; }
-  #h-temp td, #h-precip td, #h-wind td { padding: 8px 2px; }
-  th.hr .hr-time { font-size: .68rem; }
+  #h-precip td, #h-wind td { padding: 8px 2px; }
   th.hr .hr-icon { font-size: 1.25rem; }
-  .hr-temp { font-size: .82rem; }
   .hr-prob { font-size: .72rem; }
   .hr-amt  { font-size: .65rem; }
 }
@@ -194,10 +192,95 @@ th.hr { vertical-align: top; padding: 12px 3px 8px; min-width: 66px; }
 .hr-icon { font-size: 1.5rem; margin: 5px 0 2px; display: block; line-height: 1; }
 
 /* ── hourly temp / precip ── */
-.hr-temp { font-size: .9rem; font-weight: 600; color: var(--warm); }
+.h-temp-graph-cell {
+  padding: 0;
+  background: rgba(255,183,77,.05);
+}
+
+.hourly-graph {
+  position: relative;
+  height: 90px;
+  padding: 12px 0 8px;
+}
+
+.hourly-graph-svg,
+.hourly-graph-points {
+  position: absolute;
+  inset: 0;
+}
+
+.hourly-graph-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.hourly-graph-area {
+  fill: rgba(255,183,77,.12);
+}
+
+.hourly-graph-line {
+  fill: none;
+  stroke: var(--warm);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 2px 6px rgba(255,183,77,.18));
+}
+
+.hourly-graph-points {
+  display: grid;
+}
+
+.hourly-point {
+  position: relative;
+  height: 100%;
+}
+
+.hourly-point-temp,
+.hourly-point-dot {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.hourly-point-temp {
+  top: calc(var(--point-y) - 22px);
+  font-size: .88rem;
+  font-weight: 600;
+  color: var(--text);
+  text-shadow: 0 1px 8px rgba(13,27,42,.65);
+}
+
+.hourly-point-dot {
+  top: var(--point-y);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--warm);
+  border: 2px solid rgba(13,27,42,.95);
+  box-shadow: 0 0 0 3px rgba(255,183,77,.12);
+}
+
 .hr-prob { font-size: .8rem; color: var(--cool); }
 .hr-amt { font-size: .7rem; color: var(--muted); margin-top: 2px; }
 .wspd { font-size: .8rem; color: var(--muted); font-stretch: condensed; }
+
+@media (max-width: 680px) {
+  .hourly-graph {
+    height: 82px;
+  }
+
+  .hourly-point-temp {
+    top: calc(var(--point-y) - 20px);
+    font-size: .72rem;
+  }
+
+  .hourly-point-dot {
+    width: 8px;
+    height: 8px;
+  }
+}
 
 #hourly-day-label {
   padding: 6px 15px 0;
@@ -205,6 +288,29 @@ th.hr { vertical-align: top; padding: 12px 3px 8px; min-width: 66px; }
   color: var(--accent);
   text-transform: uppercase;
 }
+
+#zmanim-grid {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.zman-item {
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.03);
+  border-radius: 10px;
+  width: 140px;
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.zman-name {
+  font-size: .72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.zman-time {margin-top: 5px;}
 
 /* ── active day column ── */
 th.day.active {
