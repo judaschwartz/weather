@@ -9,14 +9,14 @@
   --cool: #64b5f6;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   background: linear-gradient(160deg, #0d1b2a 0%, #1b3a5c 60%, #0d2035 100%);
   min-height: 100vh;
   color: var(--text);
-  padding: 20px 10px;
+  padding: 20px 10px 0;
 }
 
 #loading {
@@ -118,16 +118,6 @@ body {
 .zip-btn:disabled { opacity: .55; cursor: wait; }
 .unit-btn:hover { background: rgba(255,255,255,.15); }
 
-@media (max-width: 980px) {
-  .hdr { flex-direction: column; }
-  .hdr-controls {
-    width: 100%;
-    align-items: flex-start;
-    min-width: 0;
-  }
-  .loc-form { justify-content: flex-start; flex-wrap: wrap; }
-}
-
 .card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -190,12 +180,7 @@ th.day { vertical-align: top; padding: 12px 4px; }
 th.hr { vertical-align: top; padding: 12px 3px 8px; min-width: 66px; }
 .hr-time { font-size: .78rem; font-weight: 500; }
 .hr-icon { font-size: 1.5rem; margin: 5px 0 2px; display: block; line-height: 1; }
-
-/* ── hourly temp / precip ── */
-.h-temp-graph-cell {
-  padding: 0;
-  background: rgba(255,183,77,.05);
-}
+.h-temp-graph-cell { padding: 0; }
 
 .hourly-graph {
   position: relative;
@@ -203,8 +188,7 @@ th.hr { vertical-align: top; padding: 12px 3px 8px; min-width: 66px; }
   padding: 12px 0 8px;
 }
 
-.hourly-graph-svg,
-.hourly-graph-points {
+.hourly-graph-svg, .hourly-graph-points {
   position: absolute;
   inset: 0;
 }
@@ -215,9 +199,9 @@ th.hr { vertical-align: top; padding: 12px 3px 8px; min-width: 66px; }
   overflow: visible;
 }
 
-.hourly-graph-area {
-  fill: rgba(255,183,77,.12);
-}
+.graph-band-day { fill: rgba(255,200,50,.08); }
+.graph-band-night { fill: rgba(30,60,120,.18); }
+.hourly-graph-area { fill: rgba(77, 205, 255, 0.05); }
 
 .hourly-graph-line {
   fill: none;
@@ -228,17 +212,14 @@ th.hr { vertical-align: top; padding: 12px 3px 8px; min-width: 66px; }
   filter: drop-shadow(0 2px 6px rgba(255,183,77,.18));
 }
 
-.hourly-graph-points {
-  display: grid;
-}
+.hourly-graph-points { display: grid; }
 
 .hourly-point {
   position: relative;
   height: 100%;
 }
 
-.hourly-point-temp,
-.hourly-point-dot {
+.hourly-point-temp, .hourly-point-dot {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
@@ -266,22 +247,6 @@ th.hr { vertical-align: top; padding: 12px 3px 8px; min-width: 66px; }
 .hr-amt { font-size: .7rem; color: var(--muted); margin-top: 2px; }
 .wspd { font-size: .8rem; color: var(--muted); font-stretch: condensed; }
 
-@media (max-width: 680px) {
-  .hourly-graph {
-    height: 82px;
-  }
-
-  .hourly-point-temp {
-    top: calc(var(--point-y) - 20px);
-    font-size: .72rem;
-  }
-
-  .hourly-point-dot {
-    width: 8px;
-    height: 8px;
-  }
-}
-
 #hourly-day-label {
   padding: 6px 15px 0;
   font-size: .8rem;
@@ -299,7 +264,7 @@ th.hr { vertical-align: top; padding: 12px 3px 8px; min-width: 66px; }
   border: 1px solid var(--border);
   background: rgba(255,255,255,.03);
   border-radius: 10px;
-  width: 140px;
+  width: 130px;
   padding: 10px 8px;
   text-align: center;
 }
@@ -310,9 +275,8 @@ th.hr { vertical-align: top; padding: 12px 3px 8px; min-width: 66px; }
   text-transform: uppercase;
 }
 
-.zman-time {margin-top: 5px;}
+.zman-time { margin-top: 5px; }
 
-/* ── active day column ── */
 th.day.active {
   background: rgba(79,195,247,.09);
   box-shadow: inset 0 -2px 0 var(--accent);

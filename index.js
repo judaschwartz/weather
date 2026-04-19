@@ -38,11 +38,9 @@ const HOURLY_FIELDS = 'temperature_2m,precipitation,precipitation_probability,we
 const hourlyByDayCache = new Map()
 
 const fTemp = c => Math.round(isFahrenheit ? (c * 9 / 5) + 32 : c) + '°'
-
-function fPrecip(mm) {
-  if (!mm) return '—'
-  return isFahrenheit ? `${(mm / 25.4).toFixed(2)}"` : `${mm.toFixed(1)} mm`
-}
+const fPrecip = mm => isFahrenheit ? `${(mm / 25.4).toFixed(2)}"` : `${mm.toFixed(1)} mm`
+const addMinutes = (date, minutes) => new Date(date.getTime() + (minutes * 60 * 1000))
+const formatClock = date => date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 
 function fWind(kmh) {
   if (kmh == null) return '—'
@@ -267,8 +265,7 @@ function render() {
   document.getElementById('cur-temp').textContent = fTemp(weatherData.current.temperature)
   document.getElementById('cur-icon').textContent = cwIcon
   document.getElementById('cur-desc').textContent = cwDesc
-  document.getElementById('cur-feels').textContent =
-      `Feels like ${fTemp(weatherData.current.apparent_temperature)}`
+  document.getElementById('cur-feels').textContent = `Feels like ${fTemp(weatherData.current.apparent_temperature)}`
   renderDaily()
   renderHourly()
   renderZmanim()
@@ -302,7 +299,7 @@ function buildSmoothPath(points) {
   return path
 }
 
-function buildHourlyGraph(temps) {
+function buildHourlyGraph(temps, dayFactors) {
   const graph = document.createElement('div')
   graph.className = 'hourly-graph'
 
@@ -328,6 +325,37 @@ function buildHourlyGraph(temps) {
   svg.setAttribute('preserveAspectRatio', 'none')
 
   const smoothPath = buildSmoothPath(points)
+
+  // Day/night gradient background
+  if (dayFactors && dayFactors.length === count) {
+    const gradId = 'dn-grad-' + Math.random().toString(36).slice(2, 8)
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs')
+    const grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient')
+    grad.setAttribute('id', gradId)
+    grad.setAttribute('x1', '0%'); grad.setAttribute('x2', '100%')
+    grad.setAttribute('y1', '0%'); grad.setAttribute('y2', '0%')
+    // night: dark navy, day: soft sky blue
+    const nightR = 10, nightG = 22, nightB = 40, nightA = 0.25
+    const dayR = 135, dayG = 206, dayB = 235, dayA = 0.12
+    dayFactors.forEach((f, i) => {
+      const pct = count === 1 ? 50 : (i / (count - 1)) * 100
+      const r = Math.round(nightR + (dayR - nightR) * f)
+      const g = Math.round(nightG + (dayG - nightG) * f)
+      const b = Math.round(nightB + (dayB - nightB) * f)
+      const a = +(nightA + (dayA - nightA) * f).toFixed(3)
+      const stop = document.createElementNS('http://www.w3.org/2000/svg', 'stop')
+      stop.setAttribute('offset', `${pct}%`)
+      stop.setAttribute('stop-color', `rgba(${r},${g},${b},${a})`)
+      grad.appendChild(stop)
+    })
+    defs.appendChild(grad)
+    svg.appendChild(defs)
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+    rect.setAttribute('x', 0); rect.setAttribute('y', 0)
+    rect.setAttribute('width', 100); rect.setAttribute('height', 100)
+    rect.setAttribute('fill', `url(#${gradId})`)
+    svg.appendChild(rect)
+  }
 
   const area = document.createElementNS('http://www.w3.org/2000/svg', 'path')
   area.setAttribute('class', 'hourly-graph-area')
@@ -363,12 +391,6 @@ function buildHourlyGraph(temps) {
   return graph
 }
 
-const addMinutes = (date, minutes) => new Date(date.getTime() + (minutes * 60 * 1000))
-
-function formatClock(date) {
-  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-}
-
 function renderZmanim() {
   const d = weatherData?.daily
   const grid = document.getElementById('zmanim-grid')
@@ -380,7 +402,8 @@ function renderZmanim() {
   const zmanim = [
     ['Alos', addMinutes(sunrise, -72)],
     ['Netz', sunrise],
-    ['Zman Krias Shema', new Date(sunrise.getTime() + (daylightMs / 4))],
+    ['S"Z Krias Shema', new Date(sunrise.getTime() + (daylightMs / 4))],
+    ['S"Z Tefillah', new Date(sunrise.getTime() + (daylightMs / 3))],
     ['Chatzos', new Date(sunrise.getTime() + (daylightMs / 2))],
   ]
   if (sunrise.getDay() === 5) {
@@ -458,18 +481,40 @@ function renderHourly() {
   document.getElementById('hourly-day-label').textContent = dayLabel
 
   const temps = h.temperature_2m.slice(0, hourCount)
+
+  // Compute continuous daylight factor (0=night, 1=day) with 30-min fade
+  const sunriseStr = weatherData.daily.sunrise?.[selectedDayIndex]
+  const sunsetStr = weatherData.daily.sunset?.[selectedDayIndex]
+  let dayFactors = null
+  if (sunriseStr && sunsetStr) {
+    const rise = new Date(sunriseStr).getTime()
+    const set = new Date(sunsetStr).getTime()
+    const FADE = 30 * 60 * 1000
+    const DAY_MS = 24 * 60 * 60 * 1000
+    dayFactors = h.time.slice(0, hourCount).map(t => {
+      const ts = new Date(t).getTime()
+      const dayFactor = (rise, set) => {
+        const riseF = Math.min(1, Math.max(0, (ts - rise) / FADE))
+        const setF  = Math.min(1, Math.max(0, (set  - ts) / FADE))
+        return Math.min(riseF, setF)
+      }
+      return Math.max(dayFactor(rise, set), dayFactor(rise + DAY_MS, set + DAY_MS))
+    })
+  }
+
   const tempCell = document.createElement('td')
   tempCell.colSpan = hourCount || 1
   tempCell.className = 'h-temp-graph-cell'
   if (temps.length) {
-    tempCell.appendChild(buildHourlyGraph(temps))
+    tempCell.appendChild(buildHourlyGraph(temps, dayFactors))
   }
   document.getElementById('h-temp').appendChild(tempCell)
 
   for (let i = 0; i < hourCount; i++) {
     const t = new Date(h.time[i])
     const label = t.toLocaleTimeString('en-US', { hour:'numeric', hour12:true })
-    const [, icon] = wmo(h.weathercode[i])
+    let [, icon] = wmo(h.weathercode[i])
+    if (h.weathercode[i] < 2 && dayFactors && dayFactors[i] < 0.5) icon = '🌙'
     const temp = h.temperature_2m[i]
     const prob = h.precipitation_probability[i] ?? 0
     const amt = h.precipitation[i] ?? 0
