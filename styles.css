@@ -3,7 +3,7 @@
   --card: rgba(255,255,255,0.06);
   --border: rgba(255,255,255,0.1);
   --text: #e8edf2;
-  --muted: rgba(232,237,242,0.55);
+  --muted: rgba(232,237,242,0.6);
   --accent: #4fc3f7;
   --warm: #ffb74d;
   --cool: #64b5f6;
@@ -134,16 +134,15 @@ body {
 
 /* ── table base ── */
 table { border-collapse: collapse; width: 100%; min-width: max-content; }
-th, td { padding: 10px; text-align: center; white-space: nowrap; }
+th, td { padding: 5px; text-align: center; white-space: nowrap; }
 
 /* ── hourly: all 24 columns fill the card on wide screens ── */
 @media (min-width: 1180px) {
   #h-hdr th, #h-precip td, #h-wind td { min-width: 0; width: calc(100% / 24); }
   #h-hdr, #h-precip, #h-wind { min-width: 0; }
-  .hourly-wrap table { min-width: 0; width: 100%; }
+  .hourly-wrap table { min-width: 0; width: 100%; table-layout: fixed; }
   .hourly-wrap { overflow-x: visible; }
   th.hr { padding: 10px 4px 7px; }
-  #h-precip td, #h-wind td { padding: 8px 2px; }
   th.hr .hr-icon { font-size: 1.25rem; }
   .hr-prob { font-size: .72rem; }
   .hr-amt  { font-size: .65rem; }
@@ -156,7 +155,7 @@ th, td { padding: 10px; text-align: center; white-space: nowrap; }
 
 /* ── daily day header ── */
 th.day { vertical-align: top; padding: 12px 4px; }
-.day-name { font-size: .9rem;}
+.day-name { font-size: 1rem;}
 .day-date { font-size: .9rem; color: var(--muted); margin-top: 2px; }
 .day-date span, .day-name span { font-weight: 200;}
 .day-icon { font-size: 1.9rem; margin: 7px 0 4px; display: block; line-height: 1; }
@@ -164,27 +163,33 @@ th.day { vertical-align: top; padding: 12px 4px; }
 .today { color: var(--accent) !important; }
 
 /* ── daily temp cell ── */
-.t-hi { font-size: 1.05rem; font-weight: 600; color: var(--warm); }
-.t-lo { font-size: .85rem; margin-top: 2px; }
+.t-hi { font-size: 1.5rem; font-weight: 600; }
+.t-lo { margin-top: 2px; }
 .tbar { width: 50px; height: 4px; background: rgba(255,255,255,.1); border-radius: 2px; margin: 5px auto; position: relative; overflow: hidden; }
 .tbar-fill { position: absolute; top: 0; height: 100%; background: linear-gradient(90deg, var(--cool), var(--warm)); border-radius: 2px; }
 
 /* ── daily precip cell ── */
-.p-prob { font-size: .88rem; font-weight: 500; color: var(--cool); }
-.p-amt { font-size: .72rem; color: var(--muted); margin-top: 3px; }
+.p-prob { font-size: .9rem; font-weight: 500; color: var(--cool); }
+.p-amt { font-size: .8rem; color: var(--muted); margin-top: 3px; }
 .pbar { width: 42px; height: 3px; background: rgba(100,181,246,.15); border-radius: 2px; margin: 5px auto 0; overflow: hidden; }
 .pbar-fill { height: 100%; background: var(--cool); border-radius: 2px; }
 .dim { opacity: .38; }
 
 /* ── hourly header ── */
-th.hr { vertical-align: top; padding: 12px 3px 8px; min-width: 66px; }
-.hr-time { font-size: .78rem; font-weight: 500; }
+th.hr { vertical-align: top; min-width: 66px; }
+.hr-time { color:var(--muted); font-size: .65rem; font-weight: 200; }
+.hr-time b {
+  font-size: 1.25rem;
+  line-height: .8rem;
+  color: var(--text);
+  margin: 0 2px 0 10px;
+}
 .hr-icon { font-size: 1.5rem; margin: 5px 0 2px; display: block; line-height: 1; }
 .h-temp-graph-cell { padding: 0; }
 
 .hourly-graph {
   position: relative;
-  height: 90px;
+  height: 100px;
   padding: 12px 0 8px;
 }
 
@@ -205,7 +210,6 @@ th.hr { vertical-align: top; padding: 12px 3px 8px; min-width: 66px; }
 
 .hourly-graph-line {
   fill: none;
-  stroke: var(--warm);
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -213,11 +217,7 @@ th.hr { vertical-align: top; padding: 12px 3px 8px; min-width: 66px; }
 }
 
 .hourly-graph-points { display: grid; }
-
-.hourly-point {
-  position: relative;
-  height: 100%;
-}
+.hourly-point { position: relative; height: 100%; }
 
 .hourly-point-temp, .hourly-point-dot {
   position: absolute;
@@ -225,31 +225,21 @@ th.hr { vertical-align: top; padding: 12px 3px 8px; min-width: 66px; }
   transform: translateX(-50%);
 }
 
-.hourly-point-temp {
-  top: calc(var(--point-y) - 22px);
-  font-size: .88rem;
-  font-weight: 600;
-  color: var(--text);
-  text-shadow: 0 1px 8px rgba(13,27,42,.65);
-}
-
 .hourly-point-dot {
   top: var(--point-y);
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+  height: 15px;
   background: var(--warm);
-  border: 2px solid rgba(13,27,42,.95);
+  border: 1px solid rgba(13,27,42,.95);
   box-shadow: 0 0 0 3px rgba(255,183,77,.12);
 }
 
-.hr-prob { font-size: .8rem; color: var(--cool); }
-.hr-amt { font-size: .7rem; color: var(--muted); margin-top: 2px; }
-.wspd { font-size: .8rem; color: var(--muted); font-stretch: condensed; }
+.hourly-point-temp { font-size: 1.2rem; top: calc(var(--point-y) - 25px); text-shadow: 0 0 2px #193554; }
+.hr-prob { font-size: .9rem; color: var(--cool); }
+.hr-amt { font-size: .8rem; color: var(--muted); margin-top: 2px; }
+.wspd { font-size: .9rem; font-weight: 100; color: rgba(232,237,242); font-stretch: condensed; }
 
 #hourly-day-label {
-  padding: 6px 15px 0;
-  font-size: .8rem;
+  padding: 4px 15px;
   color: var(--accent);
   text-transform: uppercase;
 }
@@ -258,14 +248,16 @@ th.hr { vertical-align: top; padding: 12px 3px 8px; min-width: 66px; }
   display: flex;
   justify-content: center;
   gap: 20px;
+  position: absolute;
+  bottom: 10px;
+  width: 100%;
 }
 
 .zman-item {
   border: 1px solid var(--border);
   background: rgba(255,255,255,.03);
   border-radius: 10px;
-  width: 130px;
-  padding: 10px 8px;
+  width: 120px;
   text-align: center;
 }
 

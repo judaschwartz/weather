@@ -38,6 +38,31 @@ const HOURLY_FIELDS = 'temperature_2m,precipitation,precipitation_probability,we
 const hourlyByDayCache = new Map()
 
 const fTemp = c => Math.round(isFahrenheit ? (c * 9 / 5) + 32 : c) + '°'
+function tempColor(celsius) {
+  const f = celsius * 9 / 5 + 32
+  const stops = [
+    [-10, [260, 70, 55]],
+    [0,   [245, 70, 60]],
+    [15,  [225, 70, 62]],
+    [32,  [210, 75, 62]],
+    [45,  [185, 65, 55]],
+    [55,  [140, 55, 55]],
+    [65,  [65,  70, 55]],
+    [75,  [40,  80, 55]],
+    [85,  [20,  90, 58]],
+    [90,  [5,   90, 62]],
+    [100, [0,   95, 68]],
+  ]
+  if (f <= stops[0][0]) return `hsl(${stops[0][1][0]}, ${stops[0][1][1]}%, ${stops[0][1][2]}%)`
+  if (f >= stops[stops.length - 1][0]) return `hsl(${stops[stops.length - 1][1][0]}, ${stops[stops.length - 1][1][1]}%, ${stops[stops.length - 1][1][2]}%)`
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (f <= stops[i + 1][0]) {
+      const t = (f - stops[i][0]) / (stops[i + 1][0] - stops[i][0])
+      const a = stops[i][1], b = stops[i + 1][1]
+      return `hsl(${a[0]+(b[0]-a[0])*t}, ${a[1]+(b[1]-a[1])*t}%, ${a[2]+(b[2]-a[2])*t}%)`
+    }
+  }
+}
 const fPrecip = mm => isFahrenheit ? `${(mm / 25.4).toFixed(2)}"` : `${mm.toFixed(1)} mm`
 const addMinutes = (date, minutes) => new Date(date.getTime() + (minutes * 60 * 1000))
 const formatClock = date => date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
@@ -266,6 +291,7 @@ function render() {
   document.getElementById('zip-input').value = currentUrl.searchParams.get('location')?.trim() || ''
   const [cwDesc, cwIcon] = wmo(weatherData.current.weathercode)
   document.getElementById('cur-temp').textContent = fTemp(weatherData.current.temperature)
+  document.getElementById('cur-temp').style.color = tempColor(weatherData.current.temperature)
   document.getElementById('cur-icon').textContent = cwIcon
   document.getElementById('cur-desc').textContent = cwDesc
   document.getElementById('cur-feels').textContent = `Feels like ${fTemp(weatherData.current.apparent_temperature)}`
@@ -369,9 +395,26 @@ function buildHourlyGraph(temps, dayFactors) {
     'Z',
   ].join(' '))
 
+  // Temperature-colored gradient for the line
+  const lineGradId = 'temp-grad-' + Math.random().toString(36).slice(2, 8)
+  const lineGradDefs = svg.querySelector('defs') || (() => { const d = document.createElementNS('http://www.w3.org/2000/svg', 'defs'); svg.prepend(d); return d })()
+  const lineGrad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient')
+  lineGrad.setAttribute('id', lineGradId)
+  lineGrad.setAttribute('x1', '0%'); lineGrad.setAttribute('x2', '100%')
+  lineGrad.setAttribute('y1', '0%'); lineGrad.setAttribute('y2', '0%')
+  points.forEach((p, i) => {
+    const pct = count === 1 ? 50 : (i / (count - 1)) * 100
+    const stop = document.createElementNS('http://www.w3.org/2000/svg', 'stop')
+    stop.setAttribute('offset', `${pct}%`)
+    stop.setAttribute('stop-color', tempColor(p.temp))
+    lineGrad.appendChild(stop)
+  })
+  lineGradDefs.appendChild(lineGrad)
+
   const line = document.createElementNS('http://www.w3.org/2000/svg', 'path')
   line.setAttribute('class', 'hourly-graph-line')
   line.setAttribute('d', smoothPath)
+  line.setAttribute('stroke', `url(#${lineGradId})`)
 
   svg.append(area, line)
   graph.appendChild(svg)
@@ -384,9 +427,10 @@ function buildHourlyGraph(temps, dayFactors) {
     const item = document.createElement('div')
     item.className = 'hourly-point'
     item.style.setProperty('--point-y', `${point.y}%`)
+    const pc = tempColor(point.temp)
     item.innerHTML = `
-      <div class="hourly-point-temp">${fTemp(point.temp)}</div>
-      <div class="hourly-point-dot"></div>`
+      <div class="hourly-point-temp" style="color:${pc}">${fTemp(point.temp)}</div>
+      <div class="hourly-point-dot" style="background:${pc}"></div>`
     pointsLayer.appendChild(item)
   })
 
@@ -452,8 +496,8 @@ function renderDaily() {
     /* temperature cell */
     const ttd = document.createElement('td')
     ttd.innerHTML = `
-      <div class="t-hi">${fTemp(hi)}</div>
-      <div class="t-lo">${fTemp(lo)}</div>`
+      <div class="t-hi" style="color:${tempColor(hi)}">${fTemp(hi)}</div>
+      <div class="t-lo" style="color:${tempColor(lo)}">${fTemp(lo)}</div>`
     document.getElementById('d-temp').appendChild(ttd)
 
     /* precipitation cell */
@@ -515,9 +559,9 @@ function renderHourly() {
 
   for (let i = 0; i < hourCount; i++) {
     const t = new Date(h.time[i])
-    const label = t.toLocaleTimeString('en-US', { hour:'numeric', hour12:true })
+    const label = t.toLocaleTimeString('en-US', { hour:'numeric', }).split(' ')
     let [, icon] = wmo(h.weathercode[i])
-    if (h.weathercode[i] < 2 && dayFactors && dayFactors[i] < 0.5) icon = '🌙'
+    if (h.weathercode[i] < 2 && dayFactors && dayFactors[i] < 0.2) icon = '🌙'
     const temp = h.temperature_2m[i]
     const prob = h.precipitation_probability[i] ?? 0
     const amt = h.precipitation[i] ?? 0
@@ -526,7 +570,7 @@ function renderHourly() {
     /* header */
     const th = document.createElement('th')
     th.className = 'hr'
-    th.innerHTML = `<div class="hr-time">${label}</div><span class="hr-icon">${icon}</span>`
+    th.innerHTML = `<div class="hr-time"><b>${label[0]}</b>${label[1]}</div><span class="hr-icon">${icon}</span>`
     document.getElementById('h-hdr').appendChild(th)
 
     /* precip */
