@@ -63,7 +63,7 @@ function toggleUnits() {
 async function loadLocation() {
   const locInput = currentUrl.searchParams.get('location')?.trim() || ''
   if (!locInput) {
-    await setCurrentLocation()
+    await setCurrentLocation(window.localStorage.getItem('lastPostalCode'))
   } else {
     const { lat, lon, name } = await lookupPostalCode(locInput)
     cachedLat = lat
@@ -72,10 +72,12 @@ async function loadLocation() {
   }
 }
 
-async function setCurrentLocation() {
-  const pos = await getPosition()
-  const { latitude, longitude } = pos.coords
-  locName = await revGeocode(latitude, longitude)
+async function setCurrentLocation(locName) {
+  if (!locName) {
+    const pos = await getPosition()
+    const { latitude, longitude } = pos.coords
+    locName = await revGeocode(latitude, longitude)
+  }
   currentUrl.searchParams.set('location', locName)
   window.history.replaceState({}, '', currentUrl)
   location.reload()
@@ -177,6 +179,7 @@ async function lookupPostalCode(postalCode) {
 function changeLocation(e) {
   e?.preventDefault()
   const postalCode = e.target.querySelector('input').value
+  window.localStorage.setItem('lastPostalCode', postalCode)
   currentUrl.searchParams.set('location', postalCode.trim())
   window.history.replaceState({}, '', currentUrl)
   location.reload()
