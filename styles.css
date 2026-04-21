@@ -47,10 +47,10 @@ body {
 #main { display: none; max-width: 1600px; margin: 0 auto; }
 
 /* ── header ── */
-.hdr { margin: 5px 15px 20px; display: flex; justify-content: space-between; align-items: flex-start; }
-.hdr h1 { font-size: 2rem; margin-left: 200px; font-stretch: expanded; }
+.hdr { margin: 0 15px 15px; display: flex; justify-content: space-between; align-items: flex-start; }
+.hdr h1 { font-size: 2.5rem; margin-left: 200px; font-stretch: expanded; position: relative; top: -5px; }
 .hdr-left { display: flex; flex-direction: column; }
-.cur-row { display: flex; align-items: flex-start; gap: 24px; margin-top: 14px; }
+.cur-row { display: flex; align-items: flex-start; gap: 24px; }
 .cur-temp { font-size: 3.8rem; font-weight: 200; line-height: 1; }
 .cur-icon { font-size: 2.4rem; line-height: 1; display: block; width: 100%; text-align: center;}
 .cur-desc { color: var(--muted); margin-top: 4px; white-space: nowrap; }
@@ -123,7 +123,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 18px;
   overflow: hidden;
-  margin-bottom: 25px;
+  margin-bottom: 20px;
   backdrop-filter: blur(8px);
 }
 
@@ -179,7 +179,7 @@ th.day { vertical-align: top; padding: 12px 4px; }
 th.hr { vertical-align: top; min-width: 66px; }
 .hr-time { color:var(--muted); font-size: .65rem; font-weight: 200; }
 .hr-time b {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   line-height: .8rem;
   color: var(--text);
   margin: 0 2px 0 10px;
@@ -233,10 +233,18 @@ th.hr { vertical-align: top; min-width: 66px; }
   box-shadow: 0 0 0 3px rgba(255,183,77,.12);
 }
 
-.hourly-point-temp { font-size: 1.2rem; top: calc(var(--point-y) - 25px); text-shadow: 0 0 2px #193554; }
+.hourly-point-temp { font-size: 1.2rem; top: calc(var(--point-y) - 25px); text-shadow: 0 0 3px #000; }
 .hr-prob { font-size: .9rem; color: var(--cool); }
 .hr-amt { font-size: .8rem; color: var(--muted); margin-top: 2px; }
-.wspd { font-size: .9rem; font-weight: 100; color: rgba(232,237,242); font-stretch: condensed; }
+.wspd { font-size: .9rem; }
+
+.wind-lbl, .prcib-lbl {
+  line-height: .1rem;
+  font-size: .9rem;
+  color: var(--muted);
+  text-align: left;
+  border-top: 1px solid var(--border);
+}
 
 #hourly-day-label {
   padding: 4px 15px;
@@ -248,9 +256,6 @@ th.hr { vertical-align: top; min-width: 66px; }
   display: flex;
   justify-content: center;
   gap: 20px;
-  position: absolute;
-  bottom: 10px;
-  width: 100%;
 }
 
 .zman-item {
@@ -259,6 +264,7 @@ th.hr { vertical-align: top; min-width: 66px; }
   border-radius: 10px;
   width: 120px;
   text-align: center;
+  padding: 5px 0;
 }
 
 .zman-name {

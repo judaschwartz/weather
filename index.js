@@ -65,18 +65,7 @@ function tempColor(celsius) {
 }
 const fPrecip = mm => isFahrenheit ? `${(mm / 25.4).toFixed(2)}"` : `${mm.toFixed(1)} mm`
 const addMinutes = (date, minutes) => new Date(date.getTime() + (minutes * 60 * 1000))
-const formatClock = date => date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-
-function fWind(kmh) {
-  if (kmh == null) return '—'
-  if (typeof kmh === 'string') {
-    const [max, min] = kmh.split('/').map(Number)
-    const vMax = Math.round(isFahrenheit ? max * 0.621371 : max)
-    const vMin = Math.round(isFahrenheit ? min * 0.621371 : min)
-    return `${vMin}-${vMax} ${isFahrenheit ? 'mph' : 'km/h'}`
-  }
-  return `${Math.round(isFahrenheit ? kmh * 0.621371 : kmh)} ${isFahrenheit ? 'mph' : 'km/h'}`
-}
+const fWind = kmh => kmh ? Math.round(isFahrenheit ? kmh * 0.621371 : kmh) : '—'
 
 function toggleUnits() {
   isFahrenheit = !isFahrenheit
@@ -287,6 +276,7 @@ function hebDate(date = new Date()) {
 }
 
 function render() {
+  document.querySelectorAll('.wind-lbl').forEach(el => el.textContent = `Wind speed (${isFahrenheit ? 'MPH' : 'KPH'})`)
   document.getElementById('loc').textContent = locName
   document.getElementById('zip-input').value = currentUrl.searchParams.get('location')?.trim() || ''
   const [cwDesc, cwIcon] = wmo(weatherData.current.weathercode)
@@ -461,7 +451,8 @@ function renderZmanim() {
   for (const [name, time] of zmanim) {
     const item = document.createElement('div')
     item.className = 'zman-item'
-    item.innerHTML = `<div class="zman-name">${name}</div><div class="zman-time">${formatClock(time)}</div>`
+    const zman = time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    item.innerHTML = `<div class="zman-name">${name}</div><div class="zman-time">${zman}</div>`
     grid.appendChild(item)
   }
 }
@@ -469,7 +460,6 @@ function renderZmanim() {
 function renderDaily() {
   ['d-hdr','d-temp','d-precip','d-wind'].forEach(clearRow)
   const d = weatherData.daily
-
   for (let i = 0; i < d.time.length; i++) {
     const sunset = new Date(d.sunset[i])
     let date = sunset.toLocaleDateString('en-US', { weekday:'short' })
@@ -479,12 +469,12 @@ function renderDaily() {
     const lo = d.temperature_2m_min[i]
     const prob = d.precipitation_probability_max[i] ?? 0
     const amt = d.precipitation_sum[i] ?? 0
-    const wind = d.wind_speed_10m_max[i] + '/' + d.wind_speed_10m_min[i]
+    const windMax = d.wind_speed_10m_max[i]
+    const windMin = d.wind_speed_10m_min[i]
 
     /* day header cell */
     const th = document.createElement('th')
     th.className = i === selectedDayIndex ? 'day active' : 'day'
-    th.style.cursor = 'pointer'
     th.innerHTML = `
       <div class="day-name">${!i ? 'Today' : date}</div>
       <div class="day-date">${hebDate(sunset)}</div>
@@ -508,7 +498,7 @@ function renderDaily() {
 
     /* wind cell */
     const wtd = document.createElement('td')
-    wtd.innerHTML = `<div class="wspd">${fWind(wind)}</div>`
+    wtd.innerHTML = `<div class="wspd">${fWind(windMin)} - ${fWind(windMax)}</div>`
     document.getElementById('d-wind').appendChild(wtd)
   }
 }
@@ -518,37 +508,29 @@ function renderHourly() {
   const isCurrentDayView = selectedDayIndex === 0 || !selectedHourlyData
   const h = isCurrentDayView ? weatherData.hourly : selectedHourlyData
   const hourCount = Math.min(24, h.time.length)
-
-  const dayLabel = (() => {
-    if (isCurrentDayView) return 'Today'
-    const iso = weatherData.daily.time[selectedDayIndex]
-    const [y, m, d] = iso.split('-').map(Number)
-    return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
-  })()
-  document.getElementById('hourly-day-label').textContent = dayLabel
-
-  const temps = h.temperature_2m.slice(0, hourCount)
-
-  // Compute continuous daylight factor (0=night, 1=day) with 30-min fade
   const sunriseStr = weatherData.daily.sunrise?.[selectedDayIndex]
   const sunsetStr = weatherData.daily.sunset?.[selectedDayIndex]
-  let dayFactors = null
-  if (sunriseStr && sunsetStr) {
-    const rise = new Date(sunriseStr).getTime()
-    const set = new Date(sunsetStr).getTime()
-    const FADE = 30 * 60 * 1000
-    const DAY_MS = 24 * 60 * 60 * 1000
-    dayFactors = h.time.slice(0, hourCount).map(t => {
-      const ts = new Date(t).getTime()
-      const dayFactor = (rise, set) => {
-        const riseF = Math.min(1, Math.max(0, (ts - rise) / FADE))
-        const setF  = Math.min(1, Math.max(0, (set  - ts) / FADE))
-        return Math.min(riseF, setF)
-      }
-      return Math.max(dayFactor(rise, set), dayFactor(rise + DAY_MS, set + DAY_MS))
-    })
-  }
+  let dayLabel =  isCurrentDayView ? 'Today, ' : ''
+  dayLabel += new Date(sunsetStr).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  dayLabel += ` - ${hebDate(new Date(sunsetStr)).split('<span>')[0]}`
 
+  document.getElementById('hourly-day-label').textContent = dayLabel
+  // Compute continuous daylight factor (0=night, 1=day) with 30-min fade
+  let dayFactors = null
+  const rise = new Date(sunriseStr).getTime()
+  const set = new Date(sunsetStr).getTime()
+  const FADE = 30 * 60 * 1000
+  const DAY_MS = 24 * 60 * 60 * 1000
+  dayFactors = h.time.slice(0, hourCount).map(t => {
+    const ts = new Date(t).getTime()
+    const dayFactor = (rise, set) => {
+      const riseF = Math.min(1, Math.max(0, (ts - rise) / FADE))
+      const setF  = Math.min(1, Math.max(0, (set  - ts) / FADE))
+      return Math.min(riseF, setF)
+    }
+    return Math.max(dayFactor(rise, set), dayFactor(rise + DAY_MS, set + DAY_MS))
+  })
+  const temps = h.temperature_2m.slice(0, hourCount)
   const tempCell = document.createElement('td')
   tempCell.colSpan = hourCount || 1
   tempCell.className = 'h-temp-graph-cell'
