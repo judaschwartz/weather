@@ -64,8 +64,8 @@ function tempColor(celsius) {
   }
 }
 const fPrecip = mm => isFahrenheit ? `${(mm / 25.4).toFixed(2)}"` : `${mm.toFixed(1)} mm`
+const fWind = kmh => kmh ? Math.round(isFahrenheit ? kmh * 0.621371 : kmh) : '0'
 const addMinutes = (date, minutes) => new Date(date.getTime() + (minutes * 60 * 1000))
-const fWind = kmh => kmh ? Math.round(isFahrenheit ? kmh * 0.621371 : kmh) : '—'
 
 function toggleUnits() {
   isFahrenheit = !isFahrenheit
@@ -318,7 +318,7 @@ function buildSmoothPath(points) {
   return path
 }
 
-function buildHourlyGraph(temps, dayFactors) {
+function buildHourlyGraph(temps, dayFactors, precips) {
   const graph = document.createElement('div')
   graph.className = 'hourly-graph'
 
@@ -330,11 +330,12 @@ function buildHourlyGraph(temps, dayFactors) {
   const spread = Math.max(actualRange, minVisualRange)
   const midTemp = (minTemp + maxTemp) / 2
   const visualMinTemp = midTemp - (spread / 2)
-  const pad = 14
+  const padTop = 12
+  const padBottom = 25
 
   const points = temps.map((temp, index) => {
     const x = count === 1 ? 50 : (index / (count - 1)) * 100
-    const y = 100 - (((temp - visualMinTemp) / spread) * (100 - (pad * 2)) + pad)
+    const y = 100 - (((temp - visualMinTemp) / spread) * (100 - padTop - padBottom) + padBottom)
     return { x, y, temp }
   })
 
@@ -413,14 +414,17 @@ function buildHourlyGraph(temps, dayFactors) {
   pointsLayer.className = 'hourly-graph-points'
   pointsLayer.style.gridTemplateColumns = `repeat(${count}, minmax(0, 1fr))`
 
-  points.forEach(point => {
+  points.forEach((point, i) => {
     const item = document.createElement('div')
     item.className = 'hourly-point'
     item.style.setProperty('--point-y', `${point.y}%`)
     const pc = tempColor(point.temp)
+    const precip = precips?.[i]
+    const hasP = precip && precip.prob > 0
     item.innerHTML = `
       <div class="hourly-point-temp" style="color:${pc}">${fTemp(point.temp)}</div>
-      <div class="hourly-point-dot" style="background:${pc}"></div>`
+      <div class="hourly-point-dot" style="background:${pc}"></div>
+      ${precip != null ? `<div class="hourly-point-precip"><div class="hr-prob${hasP ? '' : ' dim'}">${Math.round(precip.prob / 10) * 10}%</div><div class="hr-amt">${fPrecip(precip.amt)}</div></div>` : ''}`
     pointsLayer.appendChild(item)
   })
 
@@ -504,7 +508,7 @@ function renderDaily() {
 }
 
 function renderHourly() {
-  ['h-hdr','h-temp','h-precip','h-wind'].forEach(clearRow)
+  ['h-hdr','h-temp','h-wind'].forEach(clearRow)
   const isCurrentDayView = selectedDayIndex === 0 || !selectedHourlyData
   const h = isCurrentDayView ? weatherData.hourly : selectedHourlyData
   const hourCount = Math.min(24, h.time.length)
@@ -531,11 +535,15 @@ function renderHourly() {
     return Math.max(dayFactor(rise, set), dayFactor(rise + DAY_MS, set + DAY_MS))
   })
   const temps = h.temperature_2m.slice(0, hourCount)
+  const precips = h.time.slice(0, hourCount).map((_, i) => ({
+    prob: h.precipitation_probability[i] ?? 0,
+    amt: h.precipitation[i] ?? 0,
+  }))
   const tempCell = document.createElement('td')
   tempCell.colSpan = hourCount || 1
   tempCell.className = 'h-temp-graph-cell'
   if (temps.length) {
-    tempCell.appendChild(buildHourlyGraph(temps, dayFactors))
+    tempCell.appendChild(buildHourlyGraph(temps, dayFactors, precips))
   }
   document.getElementById('h-temp').appendChild(tempCell)
 
@@ -554,14 +562,6 @@ function renderHourly() {
     th.className = 'hr'
     th.innerHTML = `<div class="hr-time"><b>${label[0]}</b>${label[1]}</div><span class="hr-icon">${icon}</span>`
     document.getElementById('h-hdr').appendChild(th)
-
-    /* precip */
-    const ptd = document.createElement('td')
-    const hasP = prob > 0
-    ptd.innerHTML = `
-      <div class="hr-prob${hasP ? '' : ' dim'}">${Math.round(prob / 10) * 10}%</div>
-      <div class="hr-amt">${fPrecip(amt)}</div>`
-    document.getElementById('h-precip').appendChild(ptd)
 
     /* wind */
     const wtd = document.createElement('td')

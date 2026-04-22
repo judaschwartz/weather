@@ -138,8 +138,8 @@ th, td { padding: 5px; text-align: center; white-space: nowrap; }
 
 /* ── hourly: all 24 columns fill the card on wide screens ── */
 @media (min-width: 1180px) {
-  #h-hdr th, #h-precip td, #h-wind td { min-width: 0; width: calc(100% / 24); }
-  #h-hdr, #h-precip, #h-wind { min-width: 0; }
+  #h-hdr th, #h-wind td { min-width: 0; width: calc(100% / 24); }
+  #h-hdr, #h-wind { min-width: 0; }
   .hourly-wrap table { min-width: 0; width: 100%; table-layout: fixed; }
   .hourly-wrap { overflow-x: visible; }
   th.hr { padding: 10px 4px 7px; }
@@ -150,7 +150,7 @@ th, td { padding: 5px; text-align: center; white-space: nowrap; }
 
 /* ── row tints ── */
 #d-temp td, #h-temp td { background: rgba(255,183,77,.03); }
-#d-precip td, #h-precip td { background: rgba(100,181,246,.04); }
+#d-precip td { background: rgba(100,181,246,.04); }
 #d-wind td, #h-wind td { background: rgba(255,255,255,.02); }
 
 /* ── daily day header ── */
@@ -189,7 +189,7 @@ th.hr { vertical-align: top; min-width: 66px; }
 
 .hourly-graph {
   position: relative;
-  height: 100px;
+  height: 150px;
   padding: 12px 0 8px;
 }
 
@@ -227,13 +227,21 @@ th.hr { vertical-align: top; min-width: 66px; }
 
 .hourly-point-dot {
   top: var(--point-y);
-  height: 15px;
+  height: 10px;
   background: var(--warm);
   border: 1px solid rgba(13,27,42,.95);
   box-shadow: 0 0 0 3px rgba(255,183,77,.12);
 }
 
 .hourly-point-temp { font-size: 1.2rem; top: calc(var(--point-y) - 25px); text-shadow: 0 0 3px #000; }
+.hourly-point-precip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(var(--point-y) + 10px);
+  text-align: center;
+  white-space: nowrap;
+}
 .hr-prob { font-size: .9rem; color: var(--cool); }
 .hr-amt { font-size: .8rem; color: var(--muted); margin-top: 2px; }
 .wspd { font-size: .9rem; }
@@ -243,7 +251,6 @@ th.hr { vertical-align: top; min-width: 66px; }
   font-size: .9rem;
   color: var(--muted);
   text-align: left;
-  border-top: 1px solid var(--border);
 }
 
 #hourly-day-label {
