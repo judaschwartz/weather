@@ -26,18 +26,21 @@ const WMO = {
 }
 const wmo = code => WMO[code] || [`Unknown: ${code}`, '🌡️']
 const currentUrl = new URL(window.location.href)
-
 let weatherData = null, locName = ''
 let isFahrenheit = currentUrl.searchParams.get('cel') !== '1'
 let cachedLat = null, cachedLon = null
 let selectedDayIndex = 0
 let selectedHourlyData = null
 let resetToCurrentDayTimer = -1
-
 const HOURLY_FIELDS = 'temperature_2m,precipitation,precipitation_probability,weathercode,wind_speed_10m'
 const hourlyByDayCache = new Map()
-
 const fTemp = c => Math.round(isFahrenheit ? (c * 9 / 5) + 32 : c) + '°'
+const fPrecip = mm => isFahrenheit ? `${(mm / 25.4).toFixed(2)}"` : `${mm.toFixed(1)} mm`
+const fWind = kmh => kmh ? Math.round(isFahrenheit ? kmh * 0.621371 : kmh) : '0'
+const fTens = n => Math.round(n / 10) * 10
+const addMinutes = (date, minutes) => new Date(date.getTime() + (minutes * 60 * 1000))
+const stateOrCountry = d => `, ${d['ISO3166-2-lvl4']?.slice(0, 2) === 'US' ? d['ISO3166-2-lvl4'].slice(3) : d.country}`
+
 function tempColor(celsius) {
   const f = celsius * 9 / 5 + 32
   const stops = [
@@ -63,9 +66,6 @@ function tempColor(celsius) {
     }
   }
 }
-const fPrecip = mm => isFahrenheit ? `${(mm / 25.4).toFixed(2)}"` : `${mm.toFixed(1)} mm`
-const fWind = kmh => kmh ? Math.round(isFahrenheit ? kmh * 0.621371 : kmh) : '0'
-const addMinutes = (date, minutes) => new Date(date.getTime() + (minutes * 60 * 1000))
 
 function toggleUnits() {
   isFahrenheit = !isFahrenheit
@@ -75,26 +75,14 @@ function toggleUnits() {
 }
 
 async function loadLocation() {
-  const locInput = currentUrl.searchParams.get('location')?.trim() || ''
-  if (!locInput) {
-    await setCurrentLocation(window.localStorage.getItem('lastPostalCode'))
-  } else {
-    const { lat, lon, name } = await lookupPostalCode(locInput)
-    cachedLat = lat
-    cachedLon = lon
-    locName = name
-  }
-}
-
-async function setCurrentLocation(locName) {
-  if (!locName) {
+  if (!currentUrl.searchParams.get('location')) {
     const pos = await getPosition()
-    const { latitude, longitude } = pos.coords
-    locName = await revGeocode(latitude, longitude)
-  }
-  currentUrl.searchParams.set('location', locName)
-  window.history.replaceState({}, '', currentUrl)
-  location.reload()
+    cachedLat = pos.coords.latitude
+    cachedLon = pos.coords.longitude
+    locName = await revGeocode(cachedLat, cachedLon)
+    currentUrl.searchParams.set('location', locName)
+    window.history.replaceState({}, '', currentUrl)
+  } else ({ lat: cachedLat, lon: cachedLon, name: locName } = await lookupLocation(currentUrl.searchParams.get('location')))
 }
 
 function show(id) {
@@ -128,76 +116,48 @@ async function refresh() {
 }
 
 function getPosition() {
-  return new Promise((res, rej) => {
-    if (!navigator.geolocation)
-      return rej(new Error('Geolocation is not supported by this browser.'))
-    navigator.geolocation.getCurrentPosition(res,
-      () => rej(new Error('Location access denied. Please allow location access and try again.')),
-      { timeout: 12000 })
+  return new Promise((_, rej) => {
+    if (!navigator.geolocation) return rej(new Error('Geolocation is not supported by this browser.'))
+    navigator.geolocation.getCurrentPosition(_, () => rej(new Error('Location access denied. Allow location access and try again.')), { timeout: 15000 })
   })
 }
 
-async function lookupUsZipCode(postalCode) {
-  const normalized = postalCode.match(/^\d{5}/)?.[0]
-  if (!normalized) return null
-
-  const response = await fetch(`https://api.zippopotam.us/us/${normalized}`)
-  if (!response.ok) return null
-
-  const data = await response.json()
-  const place = data.places?.[0]
-  if (!place) return null
-
-  return {
-    lat: Number(place.latitude),
-    lon: Number(place.longitude),
-    name: `${place['place name']}, ${place['state abbreviation']}`,
-  }
-}
-
-async function lookupPostalCode(postalCode) {
-  const query = postalCode.trim()
-  if (!query) throw new Error('Enter a ZIP code first.')
-  if (/^\d{5}(?:-\d{4})?$/.test(query)) { // is usa zip
-    const usZipResult = await lookupUsZipCode(query)
-    if (usZipResult) return usZipResult
-    const usUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&countrycodes=us&postalcode=${encodeURIComponent(query)}`
-    const usResponse = await fetch(usUrl, { headers: { 'Accept-Language': 'en-US,en' } })
-    if (usResponse.ok) {
-      const usResults = await usResponse.json()
-      if (usResults.length) {
-        const result = usResults[0]
-        const name = result.address?.city || result.address?.town || result.address?.village || result.address?.county || result.display_name.split(',')[0] || query
-        return {
-          lat: Number(result.lat),
-          lon: Number(result.lon),
-          name,
-        }
-      }
-    }
-  }
-  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&q=${encodeURIComponent(query)}`
+async function lookupLocation(query) {
+  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&${/^\d{5}(?:-\d{4})?$/.test(query) ? 'countrycodes=us&postalcode' : 'q'}=${encodeURIComponent(query)}`
   const response = await fetch(url, { headers: { 'Accept-Language': 'en-US,en' } })
-  if (!response.ok) throw new Error('Could not look up that ZIP code.')
-  const results = await response.json()
-  if (!results.length) throw new Error('No location found for that ZIP code.')
-  const result = results[0]
-  const name = result.address?.city || result.address?.town || result.address?.village || result.address?.county || result.display_name.split(',')[0] || query
-  return {
-    lat: Number(result.lat),
-    lon: Number(result.lon),
-    name,
-  }
+  const results = await response?.json()
+  if (!results.length) throw new Error(`No location found for "${query}".`)
+  const pl = results[0].address
+  const name = (pl?.city || pl?.town || pl?.village || pl?.county || results[0].display_name.split(',')[0] || query) + stateOrCountry(pl)
+  return { lat: Number(results[0].lat), lon: Number(results[0].lon), name }
 }
 
 function changeLocation(e) {
   e?.preventDefault()
-  const postalCode = e.target.querySelector('input').value
-  window.localStorage.setItem('lastPostalCode', postalCode)
-  currentUrl.searchParams.set('location', postalCode.trim())
+  const input = e.target.querySelector('input').value.replace(/[^a-z0-9 \,\-]/gi, '')
+  currentUrl.searchParams.set('location', input)
   window.history.replaceState({}, '', currentUrl)
   location.reload()
 }
+
+window.addEventListener('load', async () => {
+  await init()
+  const recent = window.localStorage.getItem('lastLocations')?.split(':') || []
+  if (recent.includes(locName)) recent.splice(recent.indexOf(locName), 1)
+  recent.slice(0, 3).forEach(l => {
+    const [c, s] = l.split(', ')
+    document.getElementById('preset-links').innerHTML += `<a href="?location=${l}">${c.slice(0, 9)},${s}</a>`
+  })
+  if (locName) recent.unshift(locName)
+  window.localStorage.setItem('lastLocations', recent.slice(0, 4).join(':'))
+  setInterval(refresh, 18 * 60 * 1000)
+  setInterval(() => {
+    const now = new Date()
+    document.getElementById('hdr-time').textContent = now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }).replace('PM', '') .replace('AM', '')
+    document.getElementById('hdr-seconds').textContent = now.toLocaleTimeString('en-US', { second:'2-digit' }).padStart(2, '0')
+    document.getElementById('hdr-date').textContent = now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' })
+  }, 1 * 333)
+})
 
 async function revGeocode(lat, lon) {
   try {
@@ -206,7 +166,7 @@ async function revGeocode(lat, lon) {
       { headers: { 'Accept-Language': 'en-US,en' } }
     )
     const d = await r.json()
-    return d.address?.city || d.address?.town || d.address?.village || d.address?.county || 'My Location'
+    return (d.address?.city || d.address?.town || d.address?.village || d.address?.county || d.display_name.split(',')[0]) + stateOrCountry(d.address)
   } catch { return 'My Location' }
 }
 
@@ -278,7 +238,7 @@ function hebDate(date = new Date()) {
 function render() {
   document.querySelectorAll('.wind-lbl').forEach(el => el.textContent = `Wind speed (${isFahrenheit ? 'MPH' : 'KPH'})`)
   document.getElementById('loc').textContent = locName
-  document.getElementById('zip-input').value = currentUrl.searchParams.get('location')?.trim() || ''
+  document.getElementById('loc-input').value = currentUrl.searchParams.get('location')?.trim() || ''
   const [cwDesc, cwIcon] = wmo(weatherData.current.weathercode)
   document.getElementById('cur-temp').textContent = fTemp(weatherData.current.temperature)
   document.getElementById('cur-temp').style.color = tempColor(weatherData.current.temperature)
@@ -298,9 +258,7 @@ function clearRow(id) {
 function buildSmoothPath(points) {
   if (!points.length) return ''
   if (points.length === 1) return `M ${points[0].x} ${points[0].y}`
-
   let path = `M ${points[0].x} ${points[0].y}`
-
   for (let i = 0; i < points.length - 1; i++) {
     const prev = points[i - 1] || points[i]
     const curr = points[i]
@@ -311,17 +269,14 @@ function buildSmoothPath(points) {
     const control1Y = curr.y + (next.y - prev.y) * tension
     const control2X = next.x - (after.x - curr.x) * tension
     const control2Y = next.y - (after.y - curr.y) * tension
-
     path += ` C ${control1X} ${control1Y}, ${control2X} ${control2Y}, ${next.x} ${next.y}`
   }
-
   return path
 }
 
-function buildHourlyGraph(temps, dayFactors, precips) {
+function buildHourlyGraph(temps, dayFactors, probs, amnts) {
   const graph = document.createElement('div')
   graph.className = 'hourly-graph'
-
   const count = temps.length
   const minTemp = Math.min(...temps)
   const maxTemp = Math.max(...temps)
@@ -332,20 +287,16 @@ function buildHourlyGraph(temps, dayFactors, precips) {
   const visualMinTemp = midTemp - (spread / 2)
   const padTop = 12
   const padBottom = 25
-
   const points = temps.map((temp, index) => {
     const x = count === 1 ? 50 : (index / (count - 1)) * 100
     const y = 100 - (((temp - visualMinTemp) / spread) * (100 - padTop - padBottom) + padBottom)
     return { x, y, temp }
   })
-
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
   svg.setAttribute('class', 'hourly-graph-svg')
   svg.setAttribute('viewBox', '0 0 100 100')
   svg.setAttribute('preserveAspectRatio', 'none')
-
   const smoothPath = buildSmoothPath(points)
-
   // Day/night gradient background
   if (dayFactors && dayFactors.length === count) {
     const gradId = 'dn-grad-' + Math.random().toString(36).slice(2, 8)
@@ -376,7 +327,6 @@ function buildHourlyGraph(temps, dayFactors, precips) {
     rect.setAttribute('fill', `url(#${gradId})`)
     svg.appendChild(rect)
   }
-
   const area = document.createElementNS('http://www.w3.org/2000/svg', 'path')
   area.setAttribute('class', 'hourly-graph-area')
   area.setAttribute('d', [
@@ -385,7 +335,6 @@ function buildHourlyGraph(temps, dayFactors, precips) {
     `L ${points[points.length - 1].x} 100`,
     'Z',
   ].join(' '))
-
   // Temperature-colored gradient for the line
   const lineGradId = 'temp-grad-' + Math.random().toString(36).slice(2, 8)
   const lineGradDefs = svg.querySelector('defs') || (() => { const d = document.createElementNS('http://www.w3.org/2000/svg', 'defs'); svg.prepend(d); return d })()
@@ -401,33 +350,28 @@ function buildHourlyGraph(temps, dayFactors, precips) {
     lineGrad.appendChild(stop)
   })
   lineGradDefs.appendChild(lineGrad)
-
   const line = document.createElementNS('http://www.w3.org/2000/svg', 'path')
   line.setAttribute('class', 'hourly-graph-line')
   line.setAttribute('d', smoothPath)
   line.setAttribute('stroke', `url(#${lineGradId})`)
-
   svg.append(area, line)
   graph.appendChild(svg)
-
   const pointsLayer = document.createElement('div')
   pointsLayer.className = 'hourly-graph-points'
   pointsLayer.style.gridTemplateColumns = `repeat(${count}, minmax(0, 1fr))`
-
   points.forEach((point, i) => {
     const item = document.createElement('div')
     item.className = 'hourly-point'
     item.style.setProperty('--point-y', `${point.y}%`)
     const pc = tempColor(point.temp)
-    const precip = precips?.[i]
-    const hasP = precip && precip.prob > 0
+    const prob = probs?.[i] ?? 0
+    const amt = amnts?.[i] ?? 0
     item.innerHTML = `
       <div class="hourly-point-temp" style="color:${pc}">${fTemp(point.temp)}</div>
       <div class="hourly-point-dot" style="background:${pc}"></div>
-      ${precip != null ? `<div class="hourly-point-precip"><div class="hr-prob${hasP ? '' : ' dim'}">${Math.round(precip.prob / 10) * 10}%</div><div class="hr-amt">${fPrecip(precip.amt)}</div></div>` : ''}`
+      <div class="hourly-point-precip"><div class="hr-prob${prob ? '' : ' dim'}">${fTens(prob)}%</div><div class="hr-amt">${fPrecip(amt)}</div></div>`
     pointsLayer.appendChild(item)
   })
-
   graph.appendChild(pointsLayer)
   return graph
 }
@@ -436,7 +380,6 @@ function renderZmanim() {
   const d = weatherData?.daily
   const grid = document.getElementById('zmanim-grid')
   grid.innerHTML = ''
-
   const sunrise = new Date(d.sunrise?.[selectedDayIndex])
   const sunset = new Date(d.sunset?.[selectedDayIndex])
   const daylightMs = sunset.getTime() - sunrise.getTime()
@@ -451,7 +394,6 @@ function renderZmanim() {
     zmanim.push(['Candle Lighting', addMinutes(sunset, -18)])
   }
   zmanim.push(['Shkia', sunset], ['Tzteis', addMinutes(sunset, 60)])
-
   for (const [name, time] of zmanim) {
     const item = document.createElement('div')
     item.className = 'zman-item'
@@ -475,7 +417,6 @@ function renderDaily() {
     const amt = d.precipitation_sum[i] ?? 0
     const windMax = d.wind_speed_10m_max[i]
     const windMin = d.wind_speed_10m_min[i]
-
     /* day header cell */
     const th = document.createElement('th')
     th.className = i === selectedDayIndex ? 'day active' : 'day'
@@ -486,20 +427,16 @@ function renderDaily() {
       <div class="day-cond">${cond}</div>`
     th.addEventListener('click', () => { onDayClick(i) })
     document.getElementById('d-hdr').appendChild(th)
-
     /* temperature cell */
     const ttd = document.createElement('td')
     ttd.innerHTML = `
       <div class="t-hi" style="color:${tempColor(hi)}">${fTemp(hi)}</div>
       <div class="t-lo" style="color:${tempColor(lo)}">${fTemp(lo)}</div>`
     document.getElementById('d-temp').appendChild(ttd)
-
     /* precipitation cell */
     const ptd = document.createElement('td')
-    const hasP = prob > 0
-    ptd.innerHTML = `<div class="p-prob${hasP ? '' : ' dim'}">${Math.round(prob / 10) * 10}%</div><div class="p-amt">${fPrecip(amt)}</div>`
+    ptd.innerHTML = `<div class="p-prob${prob ? '' : ' dim'}">${fTens(prob)}%</div><div class="p-amt">${fPrecip(amt)}</div>`
     document.getElementById('d-precip').appendChild(ptd)
-
     /* wind cell */
     const wtd = document.createElement('td')
     wtd.innerHTML = `<div class="wspd">${fWind(windMin)} - ${fWind(windMax)}</div>`
@@ -512,16 +449,14 @@ function renderHourly() {
   const isCurrentDayView = selectedDayIndex === 0 || !selectedHourlyData
   const h = isCurrentDayView ? weatherData.hourly : selectedHourlyData
   const hourCount = Math.min(24, h.time.length)
-  const sunriseStr = weatherData.daily.sunrise?.[selectedDayIndex]
   const sunsetStr = weatherData.daily.sunset?.[selectedDayIndex]
   let dayLabel =  isCurrentDayView ? 'Today, ' : ''
   dayLabel += new Date(sunsetStr).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   dayLabel += ` - ${hebDate(new Date(sunsetStr)).split('<span>')[0]}`
-
   document.getElementById('hourly-day-label').textContent = dayLabel
   // Compute continuous daylight factor (0=night, 1=day) with 30-min fade
   let dayFactors = null
-  const rise = new Date(sunriseStr).getTime()
+  const rise = new Date(weatherData.daily.sunrise?.[selectedDayIndex]).getTime()
   const set = new Date(sunsetStr).getTime()
   const FADE = 30 * 60 * 1000
   const DAY_MS = 24 * 60 * 60 * 1000
@@ -535,46 +470,25 @@ function renderHourly() {
     return Math.max(dayFactor(rise, set), dayFactor(rise + DAY_MS, set + DAY_MS))
   })
   const temps = h.temperature_2m.slice(0, hourCount)
-  const precips = h.time.slice(0, hourCount).map((_, i) => ({
-    prob: h.precipitation_probability[i] ?? 0,
-    amt: h.precipitation[i] ?? 0,
-  }))
+  const probs = h.precipitation_probability.slice(0, hourCount)
+  const amnts = h.precipitation.slice(0, hourCount)
   const tempCell = document.createElement('td')
   tempCell.colSpan = hourCount || 1
   tempCell.className = 'h-temp-graph-cell'
-  if (temps.length) {
-    tempCell.appendChild(buildHourlyGraph(temps, dayFactors, precips))
-  }
+  if (temps.length) tempCell.appendChild(buildHourlyGraph(temps, dayFactors, probs, amnts))
   document.getElementById('h-temp').appendChild(tempCell)
-
   for (let i = 0; i < hourCount; i++) {
     const t = new Date(h.time[i])
     const label = t.toLocaleTimeString('en-US', { hour:'numeric', }).split(' ')
     let [, icon] = wmo(h.weathercode[i])
     if (h.weathercode[i] < 2 && dayFactors && dayFactors[i] < 0.2) icon = '🌙'
-    const temp = h.temperature_2m[i]
-    const prob = h.precipitation_probability[i] ?? 0
-    const amt = h.precipitation[i] ?? 0
     const wind = h.wind_speed_10m[i]
-
-    /* header */
     const th = document.createElement('th')
     th.className = 'hr'
     th.innerHTML = `<div class="hr-time"><b>${label[0]}</b>${label[1]}</div><span class="hr-icon">${icon}</span>`
     document.getElementById('h-hdr').appendChild(th)
-
-    /* wind */
     const wtd = document.createElement('td')
     wtd.innerHTML = `<div class="wspd">${fWind(wind)}</div>`
     document.getElementById('h-wind').appendChild(wtd)
   }
 }
-
-init()
-setInterval(refresh, 14 * 60 * 1000)
-setInterval(() => {
-  const now = new Date()
-  document.getElementById('hdr-time').textContent = now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }).replace('PM', '') .replace('AM', '')
-  document.getElementById('hdr-seconds').textContent = now.toLocaleTimeString('en-US', { second:'2-digit' }).padStart(2, '0')
-  document.getElementById('hdr-date').textContent = now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' })
-}, 1 * 333)

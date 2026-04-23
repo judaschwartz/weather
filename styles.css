@@ -89,7 +89,7 @@ body {
   width: 100%;
   justify-content: flex-end;
 }
-.zip-input {
+.loc-input {
   width: 175px;
   padding: 9px 12px;
   border-radius: 10px;
@@ -99,14 +99,14 @@ body {
   outline: none;
   font-size: .8rem;
 }
-.zip-input::placeholder { color: var(--muted); }
-.zip-input:focus {
+.loc-input::placeholder { color: var(--muted); }
+.loc-input:focus {
   border-color: rgba(79,195,247,.65);
   box-shadow: 0 0 0 2px rgba(79,195,247,.14);
 }
 .top-row { display: flex; gap: 15px; }
-.preset-links { display: flex; gap: 12px; margin-top: 4px; }
-.zip-btn, .preset-links a, .unit-btn, .rfr-btn {
+#preset-links { display: flex; gap: 12px; margin-top: 4px; }
+.loc-btn, #preset-links a, .unit-btn, .rfr-btn {
   background: rgba(255,255,255,.08); border: 1px solid var(--border);
   color: var(--text); padding: 7px 16px; border-radius: 18px;
   font-size: .8rem; cursor: pointer; white-space: nowrap;
@@ -114,8 +114,8 @@ body {
   text-decoration-line: none;
 }
 .rfr-btn { padding: 0 20px; font-size: 24px; }
-.zip-btn { padding: 9px 14px; }
-.zip-btn:disabled { opacity: .55; cursor: wait; }
+.loc-btn { padding: 9px 14px; }
+.loc-btn:disabled { opacity: .55; cursor: wait; }
 .unit-btn:hover { background: rgba(255,255,255,.15); }
 
 .card {
@@ -242,7 +242,7 @@ th.hr { vertical-align: top; min-width: 66px; }
   text-align: center;
   white-space: nowrap;
 }
-.hr-prob { font-size: .9rem; color: var(--cool); }
+.hr-prob { font-size: .9rem; color: var(--cool); text-shadow: 0 0 2px #000;}
 .hr-amt { font-size: .8rem; color: var(--muted); margin-top: 2px; }
 .wspd { font-size: .9rem; }
 
