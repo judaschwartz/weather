@@ -16,11 +16,6 @@
   <div id="error">
     <p style="font-size:1.6rem">⚠️</p>
     <p id="err-msg" style="color:var(--muted);max-width:280px;line-height:1.5">Could not load weather data.</p>
-    <button class="retry-btn" onclick="init()">Try Again</button>
-    <form class="loc-form" style="justify-content: center;" onsubmit="changeLocation(event)" style="margin-top: 16px;">
-      <input id="loc-input-error" class="loc-input" type="text" inputmode="text" autocomplete="postal-code" placeholder="ZIP code or name">
-      <button id="loc-btn-error" class="loc-btn" type="submit">Change Location</button>
-    </form>
   </div>
   <div id="main">
     <div class="hdr">

@@ -39,7 +39,7 @@ const fPrecip = mm => isFahrenheit ? `${(mm / 25.4).toFixed(2)}"` : `${mm.toFixe
 const fWind = kmh => kmh ? Math.round(isFahrenheit ? kmh * 0.621371 : kmh) : '0'
 const fTens = n => Math.round(n / 10) * 10
 const addMinutes = (date, minutes) => new Date(date.getTime() + (minutes * 60 * 1000))
-const stateOrCountry = d => `, ${d['ISO3166-2-lvl4']?.slice(0, 2) === 'US' ? d['ISO3166-2-lvl4'].slice(3) : d.country}`
+const stateOrCountry = d => `, ${d['ISO3166-2-lvl4']?.slice(0, 2) === 'US' ? d['ISO3166-2-lvl4'].slice(3) : d.country || ''}`
 
 function tempColor(celsius) {
   const f = celsius * 9 / 5 + 32
@@ -97,11 +97,13 @@ async function init() {
     await loadLocation()
     weatherData = await fetchWeather()
     render()
-    show('main')
+    setInterval(refresh, 18 * 60 * 1000)
+    setInterval(tick, 1 * 333)
   } catch (e) {
     console.error(e)
-    document.getElementById('err-msg').textContent = e.message || 'Failed to load weather data.'
     show('error')
+    document.getElementById('err-msg').textContent = e.message || 'Failed to load weather data.'
+    document.getElementById('error').appendChild(document.querySelector('.hdr-controls'))
   }
 }
 
@@ -116,9 +118,9 @@ async function refresh() {
 }
 
 function getPosition() {
-  return new Promise((_, rej) => {
+  return new Promise((res, rej) => {
     if (!navigator.geolocation) return rej(new Error('Geolocation is not supported by this browser.'))
-    navigator.geolocation.getCurrentPosition(_, () => rej(new Error('Location access denied. Allow location access and try again.')), { timeout: 15000 })
+    navigator.geolocation.getCurrentPosition((pos) => res(pos), () => rej(new Error('Location access denied. Allow location access and try again.')), { timeout: 15000 })
   })
 }
 
@@ -144,20 +146,22 @@ window.addEventListener('load', async () => {
   await init()
   const recent = window.localStorage.getItem('lastLocations')?.split(':') || []
   if (recent.includes(locName)) recent.splice(recent.indexOf(locName), 1)
+  document.querySelector('.loc-input').value = currentUrl.searchParams.get('location') || ''
   recent.slice(0, 3).forEach(l => {
     const [c, s] = l.split(', ')
     document.getElementById('preset-links').innerHTML += `<a href="?location=${l}">${c.slice(0, 9)},${s}</a>`
   })
   if (locName) recent.unshift(locName)
   window.localStorage.setItem('lastLocations', recent.slice(0, 4).join(':'))
-  setInterval(refresh, 18 * 60 * 1000)
-  setInterval(() => {
-    const now = new Date()
-    document.getElementById('hdr-time').textContent = now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }).replace('PM', '') .replace('AM', '')
-    document.getElementById('hdr-seconds').textContent = now.toLocaleTimeString('en-US', { second:'2-digit' }).padStart(2, '0')
-    document.getElementById('hdr-date').textContent = now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' })
-  }, 1 * 333)
+  setTimeout(() => location.reload(), 1000 * 60 * 60 * 24)
 })
+
+function tick() {
+  const now = new Date()
+  document.getElementById('hdr-time').textContent = now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }).replace('PM', '') .replace('AM', '')
+  document.getElementById('hdr-seconds').textContent = now.toLocaleTimeString('en-US', { second:'2-digit' }).padStart(2, '0')
+  document.getElementById('hdr-date').textContent = now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' })
+}
 
 async function revGeocode(lat, lon) {
   try {
@@ -238,7 +242,6 @@ function hebDate(date = new Date()) {
 function render() {
   document.querySelectorAll('.wind-lbl').forEach(el => el.textContent = `Wind speed (${isFahrenheit ? 'MPH' : 'KPH'})`)
   document.getElementById('loc').textContent = locName
-  document.getElementById('loc-input').value = currentUrl.searchParams.get('location')?.trim() || ''
   const [cwDesc, cwIcon] = wmo(weatherData.current.weathercode)
   document.getElementById('cur-temp').textContent = fTemp(weatherData.current.temperature)
   document.getElementById('cur-temp').style.color = tempColor(weatherData.current.temperature)
@@ -248,6 +251,7 @@ function render() {
   renderDaily()
   renderHourly()
   renderZmanim()
+  show('main')
 }
 
 function clearRow(id) {
