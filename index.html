@@ -18,7 +18,7 @@
     <p id="err-msg" style="color:var(--muted);max-width:280px;line-height:1.5">Could not load weather data.</p>
   </div>
   <div id="main">
-    <div class="hdr">
+    <div id="hdr-main" class="hdr">
       <div class="hdr-left">
         <h1 id="loc">—</h1>
         <div class="cur-row">
@@ -36,7 +36,7 @@
       </div>
       <div class="hdr-controls">
         <div class="top-row">
-          <button class="rfr-btn" type="button" onclick="refresh()">⟳</button>
+          <button class="rfr-btn" type="button" onclick="location.reload()">⟳</button>
           <button class="unit-btn" onclick="toggleUnits()">°F / °C</button>
           <form class="loc-form" onsubmit="changeLocation(event)">
             <input id="loc-input" class="loc-input" type="text" inputmode="text" autocomplete="postal-code" placeholder="ZIP code or name">

@@ -32,6 +32,7 @@ let cachedLat = null, cachedLon = null
 let selectedDayIndex = 0
 let selectedHourlyData = null
 let resetToCurrentDayTimer = -1
+let lastSecond = -1
 const HOURLY_FIELDS = 'temperature_2m,precipitation,precipitation_probability,weathercode,wind_speed_10m'
 const hourlyByDayCache = new Map()
 const fTemp = c => Math.round(isFahrenheit ? (c * 9 / 5) + 32 : c) + '°'
@@ -39,7 +40,7 @@ const fPrecip = mm => isFahrenheit ? `${(mm / 25.4).toFixed(2)}"` : `${mm.toFixe
 const fWind = kmh => kmh ? Math.round(isFahrenheit ? kmh * 0.621371 : kmh) : '0'
 const fTens = n => Math.round(n / 10) * 10
 const addMinutes = (date, minutes) => new Date(date.getTime() + (minutes * 60 * 1000))
-const stateOrCountry = d => `, ${d['ISO3166-2-lvl4']?.slice(0, 2) === 'US' ? d['ISO3166-2-lvl4'].slice(3) : d.country || ''}`
+const stateOrCountry = d => `, ${(d['ISO3166-2-lvl4']?.slice(0, 2) === 'US' ? d['ISO3166-2-lvl4'].slice(3) : d.country) || ''}`
 
 function tempColor(celsius) {
   const f = celsius * 9 / 5 + 32
@@ -96,13 +97,15 @@ async function init() {
   try {
     await loadLocation()
     weatherData = await fetchWeather()
+    selectedDayIndex = 0
+    selectedHourlyData = null
+    hourlyByDayCache.clear()
     render()
-    setInterval(refresh, 18 * 60 * 1000)
-    setInterval(tick, 1 * 333)
   } catch (e) {
     console.error(e)
     show('error')
     document.getElementById('err-msg').textContent = e.message || 'Failed to load weather data.'
+    renderLastLocations(true)
     document.getElementById('error').appendChild(document.querySelector('.hdr-controls'))
   }
 }
@@ -110,8 +113,6 @@ async function init() {
 async function refresh() {
   try {
     weatherData = await fetchWeather()
-    selectedDayIndex = 0
-    selectedHourlyData = null
     hourlyByDayCache.clear()
     render()
   } catch { console.log('Failed to refresh weather data, data stayed as-is') }
@@ -139,28 +140,37 @@ function changeLocation(e) {
   const input = e.target.querySelector('input').value.replace(/[^a-z0-9 \,\-]/gi, '')
   currentUrl.searchParams.set('location', input)
   window.history.replaceState({}, '', currentUrl)
-  location.reload()
+  init()
 }
 
 window.addEventListener('load', async () => {
   await init()
+  setInterval(refresh, 18 * 60 * 1000)
+  setInterval(() => window.location.reload(true), 7 * 24 * 60 * 60 * 1000)
+  requestAnimationFrame(tick)
+})
+
+function renderLastLocations(isError = false) {
   const recent = window.localStorage.getItem('lastLocations')?.split(':') || []
-  if (recent.includes(locName)) recent.splice(recent.indexOf(locName), 1)
-  document.querySelector('.loc-input').value = currentUrl.searchParams.get('location') || ''
+  if (recent.includes(locName) && !isError) recent.splice(recent.indexOf(locName), 1)
+  document.getElementById('preset-links').innerHTML = ''
   recent.slice(0, 3).forEach(l => {
     const [c, s] = l.split(', ')
-    document.getElementById('preset-links').innerHTML += `<a href="?location=${l}">${c.slice(0, 9)},${s}</a>`
+    document.getElementById('preset-links').innerHTML += `<a onclick="changeLocation({ preventDefault: () => {}, target: { querySelector: () => ({ value: '${l}' }) } })">${c.slice(0, 9)},${s}</a>`
   })
-  if (locName) recent.unshift(locName)
+  if (locName && !isError) recent.unshift(locName)
   window.localStorage.setItem('lastLocations', recent.slice(0, 4).join(':'))
-  setTimeout(() => location.reload(), 1000 * 60 * 60 * 24)
-})
+}
 
 function tick() {
   const now = new Date()
-  document.getElementById('hdr-time').textContent = now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }).replace('PM', '') .replace('AM', '')
-  document.getElementById('hdr-seconds').textContent = now.toLocaleTimeString('en-US', { second:'2-digit' }).padStart(2, '0')
-  document.getElementById('hdr-date').textContent = now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' })
+  if (lastSecond !== now.getSeconds()) {
+    lastSecond = now.getSeconds()
+    document.getElementById('hdr-time').textContent = now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }).replace('PM', '') .replace('AM', '')
+    document.getElementById('hdr-seconds').textContent = String(lastSecond).padStart(2, '0')
+    document.getElementById('hdr-date').textContent = now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' })
+  }
+  requestAnimationFrame(tick)
 }
 
 async function revGeocode(lat, lon) {
@@ -240,6 +250,7 @@ function hebDate(date = new Date()) {
 }
 
 function render() {
+  document.querySelector('.loc-input').value = currentUrl.searchParams.get('location') || ''
   document.querySelectorAll('.wind-lbl').forEach(el => el.textContent = `Wind speed (${isFahrenheit ? 'MPH' : 'KPH'})`)
   document.getElementById('loc').textContent = locName
   const [cwDesc, cwIcon] = wmo(weatherData.current.weathercode)
@@ -251,6 +262,8 @@ function render() {
   renderDaily()
   renderHourly()
   renderZmanim()
+  document.getElementById('hdr-main').appendChild(document.querySelector('.hdr-controls'))
+  renderLastLocations()
   show('main')
 }
 
@@ -285,15 +298,12 @@ function buildHourlyGraph(temps, dayFactors, probs, amnts) {
   const minTemp = Math.min(...temps)
   const maxTemp = Math.max(...temps)
   const actualRange = maxTemp - minTemp
-  const minVisualRange = isFahrenheit ? (15 * 5 / 9) : 15
-  const spread = Math.max(actualRange, minVisualRange)
+  const spread = Math.max(actualRange, 11) // ensure at least 20°F range
   const midTemp = (minTemp + maxTemp) / 2
   const visualMinTemp = midTemp - (spread / 2)
-  const padTop = 12
-  const padBottom = 25
   const points = temps.map((temp, index) => {
     const x = count === 1 ? 50 : (index / (count - 1)) * 100
-    const y = 100 - (((temp - visualMinTemp) / spread) * (100 - padTop - padBottom) + padBottom)
+    const y = 100 - (((temp - visualMinTemp) / spread) * 64 + 25) // map to 25%-89% vertical range
     return { x, y, temp }
   })
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
