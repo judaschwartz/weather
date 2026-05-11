@@ -377,13 +377,12 @@ function buildHourlyGraph(temps, dayFactors, probs, amnts) {
     const item = document.createElement('div')
     item.className = 'hourly-point'
     item.style.setProperty('--point-y', `${point.y}%`)
-    const pc = tempColor(point.temp)
-    const prob = probs?.[i] ?? 0
-    const amt = amnts?.[i] ?? 0
     item.innerHTML = `
-      <div class="hourly-point-temp" style="color:${pc}">${fTemp(point.temp)}</div>
-      <div class="hourly-point-dot" style="background:${pc}"></div>
-      <div class="hourly-point-precip"><div class="hr-prob${prob ? '' : ' dim'}">${fTens(prob)}%</div><div class="hr-amt">${fPrecip(amt)}</div></div>`
+      <div class="hourly-point-temp" style="color:${tempColor(point.temp)}">${fTemp(point.temp)}</div>
+      <div class="hourly-point-dot" style="background:${tempColor(point.temp)}"></div>`
+    if (probs?.[i])
+      item.innerHTML += `<div class="hourly-point-precip${probs[i] > 20 ? '' : ' dim'}"><div class="hr-prob">${fTens(probs[i])}%</div><div class="hr-amt">${fPrecip(amnts?.[i] ?? 0)}</div></div>`
+    else item.innerHTML += `<div class="hourly-point-precip dim">--</div>`
     pointsLayer.appendChild(item)
   })
   graph.appendChild(pointsLayer)
@@ -428,7 +427,6 @@ function renderDaily() {
     const hi = d.temperature_2m_max[i]
     const lo = d.temperature_2m_min[i]
     const prob = d.precipitation_probability_max[i] ?? 0
-    const amt = d.precipitation_sum[i] ?? 0
     const windMax = d.wind_speed_10m_max[i]
     const windMin = d.wind_speed_10m_min[i]
     /* day header cell */
@@ -449,7 +447,8 @@ function renderDaily() {
     document.getElementById('d-temp').appendChild(ttd)
     /* precipitation cell */
     const ptd = document.createElement('td')
-    ptd.innerHTML = `<div class="p-prob${prob ? '' : ' dim'}">${fTens(prob)}%</div><div class="p-amt">${fPrecip(amt)}</div>`
+    if (prob < 18) ptd.className = 'dim'
+    ptd.innerHTML = `<div class="p-prob">${fTens(prob)}%</div><div class="p-amt">${fPrecip(d.precipitation_sum[i] ?? 0)}</div>`
     document.getElementById('d-precip').appendChild(ptd)
     /* wind cell */
     const wtd = document.createElement('td')
