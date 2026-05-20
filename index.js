@@ -89,7 +89,7 @@ async function loadLocation() {
 function show(id) {
   document.getElementById('loading').style.display = id === 'loading' ? 'flex' : 'none'
   document.getElementById('error').style.display = id === 'error' ? 'flex' : 'none'
-  document.getElementById('main').style.display = id === 'main' ? 'block': 'none'
+  document.getElementById('main').style.display = id === 'main' ? 'block' : 'none'
 }
 
 async function init() {
@@ -106,7 +106,6 @@ async function init() {
     show('error')
     document.getElementById('err-msg').textContent = e.message || 'Failed to load weather data.'
     renderLastLocations(true)
-    document.getElementById('error').appendChild(document.querySelector('.hdr-controls'))
   }
 }
 
@@ -140,37 +139,63 @@ function changeLocation(e) {
   const input = e.target.querySelector('input').value.replace(/[^a-z0-9 \,\-]/gi, '')
   currentUrl.searchParams.set('location', input)
   window.history.replaceState({}, '', currentUrl)
+  closeSettingsModal()
   init()
 }
 
+function openSettingsModal() {
+  document.getElementById('settings-modal').showModal()
+  document.getElementById('settings-open').setAttribute('aria-expanded', 'true')
+}
+
+function closeSettingsModal() {
+  document.getElementById('settings-modal').close()
+  document.getElementById('settings-open').setAttribute('aria-expanded', 'false')
+}
+
+function setupSettingsModal() {
+  document.getElementById('settings-open').addEventListener('click', openSettingsModal)
+  document.getElementById('settings-modal').addEventListener('click', (event) => {
+    if (event.target instanceof HTMLElement && event.target.dataset.closeSettings === 'true') closeSettingsModal()
+  })
+}
+
 window.addEventListener('load', async () => {
+  setupSettingsModal()
   await init()
   setInterval(refresh, 18 * 60 * 1000)
   setInterval(() => window.location.reload(true), 7 * 24 * 60 * 60 * 1000)
-  requestAnimationFrame(tick)
+  tick()
 })
 
 function renderLastLocations(isError = false) {
   const recent = window.localStorage.getItem('lastLocations')?.split(':') || []
   if (recent.includes(locName) && !isError) recent.splice(recent.indexOf(locName), 1)
-  document.getElementById('preset-links').innerHTML = ''
-  recent.slice(0, 3).forEach(l => {
-    const [c, s] = l.split(', ')
-    document.getElementById('preset-links').innerHTML += `<a onclick="changeLocation({ preventDefault: () => {}, target: { querySelector: () => ({ value: '${l}' }) } })">${c.slice(0, 9)},${s}</a>`
+  const presets = document.getElementById('preset-links')
+  while (presets.firstChild) presets.removeChild(presets.firstChild)
+  recent.slice(0, 6).forEach(l => {
+    const link = document.createElement('a')
+    link.href = '#'
+    link.textContent = l
+    link.addEventListener('click', (event) => {
+      event.preventDefault()
+      changeLocation({ preventDefault: () => {}, target: { querySelector: () => ({ value: l }) } })
+    })
+    presets.appendChild(link)
   })
   if (locName && !isError) recent.unshift(locName)
-  window.localStorage.setItem('lastLocations', recent.slice(0, 4).join(':'))
+  window.localStorage.setItem('lastLocations', recent.slice(0, 7).join(':'))
 }
 
 function tick() {
   const now = new Date()
   if (lastSecond !== now.getSeconds()) {
     lastSecond = now.getSeconds()
-    document.getElementById('hdr-time').textContent = now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }).replace('PM', '') .replace('AM', '')
+    document.getElementById('hdr-time').innerHTML = now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }).replace('PM', '') .replace('AM', '').replace(':', '<i>:</i>')
     document.getElementById('hdr-seconds').textContent = String(lastSecond).padStart(2, '0')
     document.getElementById('hdr-date').textContent = now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' })
   }
-  requestAnimationFrame(tick)
+  setTimeout(tick, 500)
 }
 
 async function revGeocode(lat, lon) {
@@ -262,7 +287,6 @@ function render() {
   renderDaily()
   renderHourly()
   renderZmanim()
-  document.getElementById('hdr-main').appendChild(document.querySelector('.hdr-controls'))
   renderLastLocations()
   show('main')
 }

@@ -19,6 +19,107 @@ html, body {
 html { position: fixed; width: 100%; height: 100%; overflow: hidden; }
 body { position: relative;  padding: 20px 10px; color: var(--text); }
 
+.settings-open {
+  position: fixed;
+  top: 16px;
+  right: 18px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: rgba(12, 28, 46, 0.75);
+  color: var(--text);
+  font-size: 1.35rem;
+  z-index: 90;
+}
+
+.settings-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.settings-modal::backdrop {
+  background: transparent;
+}
+
+.settings-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 12, 20, 0.68);
+}
+
+.settings-panel {
+  position: absolute;
+  top: 70px;
+  right: 18px;
+  width: min(510px, calc(100vw - 28px));
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: #142c44f7;
+}
+
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 15px;
+}
+
+.settings-subtitle {
+  color: var(--muted);
+  font-size: .8rem;
+  letter-spacing: .02em;
+  margin-bottom: 2px;
+}
+
+.settings-section {
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 14px;
+  padding: 11px;
+  background: #13283ef7;
+}
+
+.settings-label {
+  font-size: .72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .11em;
+  margin-bottom: 8px;
+}
+
+.settings-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.settings-btn {
+  width: 100%;
+  min-height: 42px;
+  border-radius: 12px;
+  font-size: .78rem;
+  text-align: center;
+  padding: 10px 11px;
+}
+
+.settings-actions .rfr-btn {
+  font-size: .78rem;
+  padding: 10px 11px;
+}
+
+.settings-loc-form {
+  justify-content: stretch;
+  gap: 9px;
+}
+
 #loading {
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
@@ -47,24 +148,26 @@ body { position: relative;  padding: 20px 10px; color: var(--text); }
 #main { display: none; max-width: 1600px; margin: 0 auto; }
 
 /* ── header ── */
-.hdr { margin: 0 15px 15px; display: flex; justify-content: space-between; align-items: flex-start; }
-.hdr h1 { font-size: 2.5rem; margin-left: 200px; font-stretch: expanded; position: relative; top: -5px; }
+.hdr {margin: 0 15px 15px; display: flex; justify-content: space-between; align-items: flex-start;}
+.hdr h1 {white-space: nowrap;font-size: 3rem;position: absolute; top: 0;}
 .hdr-left { display: flex; flex-direction: column; }
-.cur-row { display: flex; align-items: flex-start; gap: 24px; }
-.cur-temp { font-size: 3.8rem; font-weight: 200; line-height: 1; }
-.cur-icon { font-size: 2.4rem; line-height: 1; display: block; width: 100%; text-align: center;}
-.cur-desc { color: var(--muted); margin-top: 4px; white-space: nowrap; }
-.cur-feels { color: var(--muted); margin-top: -25px; white-space: nowrap; position: absolute; }
+.cur-row {display: flex;align-items: flex-start;gap: 20px;}
+.cur-temp {font-size: 4.75rem;font-weight: 200;line-height: 1;margin-top: 20px;}
+.cur-icon {margin: 20px 0 0 -5px;}
+#cur-icon {font-size: 3.5rem;line-height: 1;display: block;width: 100%;text-align: center;}
+#cur-desc { color: var(--muted); margin-top: 4px; white-space: nowrap; }
+.cur-feels {color: var(--muted);white-space: nowrap;position: absolute;top: 15px;font-size: 1.25rem;}
 .datetime-block {
   display: flex; flex-direction: row; align-items: stretch; gap: 0;
   border-left: 1px solid var(--border);
 }
 .dt-time, .dt-date {
-  font-size: min(4rem, 4.1cqi); font-weight: 200; line-height: 1; 
+  font-size: 3.5rem; font-weight: 200; line-height: 1; 
   padding: 0 15px; white-space: nowrap;
-  display: flex; align-items: center; letter-spacing: -.2px;
+  display: flex; align-items: end; position: relative;
 }
 .dt-time {
+  font-size: 6.75rem;
   font-family: monospace;
   color: var(--accent);
   border-right: 1px solid var(--border);
@@ -73,9 +176,13 @@ body { position: relative;  padding: 20px 10px; color: var(--text); }
   font-weight: bold;
 }
 #hdr-seconds {
-  position: absolute; right: 7px; bottom: 7px;
-  font-size: 1.1rem; color: var(--text);
+  position: absolute;
+  right: 5px;
+  bottom: 15px;
+  font-size: 20px;
+  color: var(--text);
 }
+#hdr-time i {font-style: normal; font-family: sans-serif; position: relative; top: -10px; left: -3px;}
 .hdr-controls {
   display: flex;
   flex-direction: column;
@@ -108,17 +215,64 @@ body { position: relative;  padding: 20px 10px; color: var(--text); }
 }
 .top-row { display: flex; gap: 15px; }
 #preset-links { display: flex; gap: 12px; margin-top: 15px; }
+
+.settings-body .loc-form {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.settings-body .loc-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-body #preset-links {
+  margin-top: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .loc-btn, #preset-links a, .unit-btn, .rfr-btn {
   background: rgba(255,255,255,.08); border: 1px solid var(--border);
   color: var(--text); padding: 7px 16px; border-radius: 18px;
   font-size: .8rem; white-space: nowrap;
-  transition: background .15s;
+  transition: background .15s, border-color .15s;
   text-decoration-line: none;
 }
 .rfr-btn { padding: 0 20px; font-size: 24px; }
-.loc-btn { padding: 9px 14px; }
+.loc-btn { padding: 9px 14px; border-radius: 12px; }
 .loc-btn:disabled { opacity: .55; }
-.unit-btn:hover { background: rgba(255,255,255,.15); }
+.unit-btn:hover, .rfr-btn:hover, #preset-links a:hover, .loc-btn:hover { background: rgba(255,255,255,.15); border-color: rgba(79,195,247,.45); }
+
+.settings-body #preset-links a {
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: .74rem;
+  max-width: 100%;
+}
+
+@media (max-width: 620px) {
+  .settings-panel {
+    top: auto;
+    right: 8px;
+    left: 8px;
+    bottom: 10px;
+    width: auto;
+  }
+
+  .settings-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-loc-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settings-loc-form .loc-input,
+  .settings-loc-form .loc-btn {
+    width: 100%;
+  }
+}
 
 .card {
   background: var(--card);

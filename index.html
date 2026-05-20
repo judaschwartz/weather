@@ -9,6 +9,7 @@
   <script src="index.js" defer></script>
 </head>
 <body>
+  <button id="settings-open" class="settings-open" type="button" aria-label="Open settings" aria-haspopup="dialog" aria-controls="settings-modal" aria-expanded="false">⚙</button>
   <div id="loading">
     <div class="spinner"></div>
     <p style="color:var(--muted);font-size:.85rem">Fetching your weather…</p>
@@ -20,30 +21,21 @@
   <div id="main">
     <div id="hdr-main" class="hdr">
       <div class="hdr-left">
-        <h1 id="loc">—</h1>
         <div class="cur-row">
           <div class="cur-feels" id="cur-feels"></div>
           <div class="cur-temp" id="cur-temp">—</div>
-          <div>
-            <span class="cur-icon" id="cur-icon"></span>
+          <div class="cur-icon">
+            <span id="cur-icon"></span>
             <div class="cur-desc" id="cur-desc">—</div>
           </div>
           <div class="datetime-block">
             <div class="dt-time"><span id="hdr-time">—</span><span id="hdr-seconds">—</span></div>
-            <div class="dt-date" id="hdr-date">—</div>
+            <div class="dt-date">
+              <h1 id="loc">—</h1>
+              <div id="hdr-date">—</div>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="hdr-controls">
-        <div class="top-row">
-          <button class="rfr-btn" type="button" onclick="location.reload()">⟳</button>
-          <button class="unit-btn" onclick="toggleUnits()">°F / °C</button>
-          <form class="loc-form" onsubmit="changeLocation(event)">
-            <input id="loc-input" class="loc-input" type="text" inputmode="text" autocomplete="postal-code" placeholder="ZIP code or name">
-            <button id="loc-btn" class="loc-btn" type="submit">Change Location</button>
-          </form>
-        </div>
-        <div id="preset-links"></div>
       </div>
     </div>
     <div class="card">
@@ -74,5 +66,28 @@
     </div>
     <div id="zmanim-grid"></div>
   </div>
+    <dialog id="settings-modal" class="settings-modal" aria-labelledby="settings-title">
+      <div class="settings-backdrop" data-close-settings="true"></div>
+      <div class="settings-panel">
+        <div class="settings-body">
+          <section class="settings-section" aria-label="Display settings">
+            <p class="settings-label">Display</p>
+            <div class="settings-actions">
+              <button class="unit-btn settings-btn" type="button" onclick="toggleUnits()">Switch Units (°F / °C)</button>
+              <button class="rfr-btn settings-btn" type="button" onclick="location.reload()">Refresh Screen</button>
+            </div>
+          </section>
+          <section class="settings-section" aria-label="Location settings">
+            <p class="settings-label">Location (ZIP code or name)</p>
+            <form class="loc-form settings-loc-form" onsubmit="changeLocation(event)">
+              <input id="loc-input" class="loc-input" type="text" inputmode="text" autocomplete="postal-code" placeholder="ZIP code or city name">
+              <button id="loc-btn" class="loc-btn" type="submit">Apply</button>
+            </form>
+            <br><p class="settings-label">Recent</p>
+            <div id="preset-links"></div>
+          </section>
+        </div>
+      </div>
+    </dialog>
 </body>
 </html>
