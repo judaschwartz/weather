@@ -182,7 +182,7 @@ body { position: relative;  padding: 20px 10px; color: var(--text); }
   font-size: 20px;
   color: var(--text);
 }
-#hdr-time i {font-style: normal; font-family: sans-serif; position: relative; top: -10px; left: -3px;}
+#hdr-time i {font-style: normal; font-family: sans-serif; position: relative; top: -10px; left: -2px;}
 .hdr-controls {
   display: flex;
   flex-direction: column;
